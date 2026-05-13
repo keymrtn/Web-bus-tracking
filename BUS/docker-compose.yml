@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+    networks:
+      - web-net
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bus_management
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - web-net
+
+networks:
+  web-net:
+
+volumes:
+  db_data:
