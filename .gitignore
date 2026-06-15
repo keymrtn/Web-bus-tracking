@@ -1,0 +1,10 @@
+# Ignore local archive bundles
+*.tar.gz
+*.zip
+*.rar
+
+# IDEs and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

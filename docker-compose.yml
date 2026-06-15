@@ -1,0 +1,7 @@
+services:
+  web-bus-tracking:
+    build: .
+    container_name: busgo-web
+    ports:
+      - "8088:80"
+    restart: always

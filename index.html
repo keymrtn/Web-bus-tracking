@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusGo — Cari Jadwal Bus & Tracking</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+    <div class="header-profile" id="user-header">
+      <!-- Loaded dynamically -->
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Search Form Card -->
+    <section class="card">
+      <h2>Cari Jadwal Bus</h2>
+      <form id="search-form">
+        <div class="form-group">
+          <label class="form-label" for="select-route">Pilih Rute Perjalanan</label>
+          <select class="form-control" id="select-route" required>
+            <option value="">-- Pilih Rute --</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="select-date">Pilih Tanggal</label>
+          <input class="form-control" type="date" id="select-date" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search"></i> Cari Jadwal
+        </button>
+      </form>
+    </section>
+
+    <!-- Schedule Results -->
+    <section id="results-section" style="display: none;">
+      <h3 id="results-title">Jadwal Tersedia</h3>
+      <div id="schedule-list">
+        <!-- Rendered JS -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom Nav Bar -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item active">
+      <i class="bi bi-search"></i>
+      <span>Cari</span>
+    </a>
+    <a href="my-tickets.html" class="nav-item">
+      <i class="bi bi-ticket-perforated"></i>
+      <span>Tiket Saya</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check Auth
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      // Display user header
+      const headerDiv = document.getElementById("user-header");
+      headerDiv.innerHTML = `
+        <span style="font-size:0.9rem; margin-right: 10px;">Halo, <b>${currentUser.name}</b></span>
+        <button id="btn-logout" class="btn" style="padding: 4px 8px; font-size: 0.8rem; width: auto; background: rgba(255,255,255,0.1); border: 1px solid var(--border);">Logout</button>
+      `;
+
+      document.getElementById("btn-logout").addEventListener("click", () => {
+        storage.logout();
+        window.location.href = "login.html";
+      });
+
+      const routeSelect = document.getElementById("select-route");
+      const dateInput = document.getElementById("select-date");
+      
+      // Set default date to today (or June 18, 2026 for testing)
+      const testDate = "2026-06-18";
+      dateInput.value = testDate;
+
+      // Fill routes dynamically from ROUTES list
+      ROUTES.forEach(route => {
+        const option = document.createElement("option");
+        option.value = route.id;
+        option.textContent = `${route.nama} (${route.awal} ➔ ${route.akhir})`;
+        routeSelect.appendChild(option);
+      });
+      
+      // Handle search submit
+      document.getElementById("search-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const routeId = routeSelect.value;
+        const selectedDate = dateInput.value;
+        
+        // Generate and filter schedules
+        const allSchedules = generateSchedulesForDate(selectedDate);
+        const filtered = allSchedules.filter(s => s.routeId === routeId);
+        
+        const resultsSection = document.getElementById("results-section");
+        const listDiv = document.getElementById("schedule-list");
+        
+        listDiv.innerHTML = "";
+        resultsSection.style.display = "block";
+        
+        if (filtered.length === 0) {
+          listDiv.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              <i class="bi bi-calendar-x" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;"></i>
+              Tidak ada jadwal pada tanggal ini.
+            </div>
+          `;
+          return;
+        }
+        
+        filtered.forEach(schedule => {
+          const availableSeats = storage.getAvailableSeats(schedule.id);
+          const isSoldOut = availableSeats === 0;
+
+          const item = document.createElement("div");
+          item.className = "schedule-item";
+          item.innerHTML = `
+            <div class="schedule-details">
+              <div>
+                <strong>${schedule.busNomor}</strong>
+                <span class="bus-type">${schedule.busTipe}</span>
+              </div>
+              <div style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);">
+                <i class="bi bi-clock"></i> ${schedule.jamBerangkat} WIB ➔ ${schedule.jamSampai} WIB
+              </div>
+              <div style="margin-top: 5px; font-weight: 600; color: var(--primary);">
+                Rp ${schedule.harga.toLocaleString("id-ID")}
+                <span style="font-size: 0.8rem; margin-left: 10px; color: ${isSoldOut ? '#ef4444' : 'var(--success)'};">Sisa Kursi: ${availableSeats}</span>
+              </div>
+            </div>
+            <div>
+              ${isSoldOut ? 
+                `<button class="btn btn-secondary" disabled style="padding: 6px 12px; font-size: 0.85rem; cursor: not-allowed; opacity: 0.7;">Penuh</button>` : 
+                `<a href="booking.html?scheduleId=${schedule.id}" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;">Pesan</a>`
+              }
+            </div>
+          `;
+          listDiv.appendChild(item);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

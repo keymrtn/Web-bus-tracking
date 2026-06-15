@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pembayaran QRIS — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .payment-container {
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .timer-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .timer-text {
+      color: #ef4444;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .qris-header {
+      background: #fff;
+      color: #000;
+      padding: 10px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+      font-weight: bold;
+      border-bottom: 2px solid #ccc;
+    }
+    .qris-body {
+      background: #fff;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+    .qris-logo {
+      font-weight: 900;
+      font-style: italic;
+      font-size: 1.8rem;
+      letter-spacing: -1px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+    }
+    .qris-logo span:nth-child(1) { color: #00569f; }
+    .qris-logo span:nth-child(2) { color: #f47a20; }
+    .qris-logo span:nth-child(3) { color: #000000; }
+    .qris-logo span:nth-child(4) { color: #00a44f; }
+    
+    .instruction-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .instruction-num {
+      background: var(--primary);
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    /* Verification screen */
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+    .payment-spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(249, 115, 22, 0.1);
+      border-left-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 30px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+  </header>
+
+  <main class="payment-container">
+    
+    <!-- Screen 1: Payment Instructions & Details -->
+    <div id="screen-details" class="screen active">
+      <div style="margin-bottom: 1rem;">
+        <a href="booking.html" id="back-btn" style="color: var(--text-muted); font-size: 0.9rem;">
+          <i class="bi bi-chevron-left"></i> Batalkan & Kembali
+        </a>
+      </div>
+
+      <div class="timer-box">
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Selesaikan Pembayaran Dalam</div>
+        <div id="countdown" class="timer-text">15:00</div>
+      </div>
+
+      <!-- Ticket info card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NO. PESANAN</span>
+            <strong id="ticket-id" style="color: var(--primary);">--</strong>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">METODE</span>
+            <strong style="color: var(--secondary);">QRIS</strong>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-muted);">Total Tagihan:</span>
+          <strong id="total-amount" style="font-size: 1.4rem; color: var(--success);">Rp 0</strong>
+        </div>
+      </div>
+
+      <!-- QRIS QR Section -->
+      <div class="qris-header">
+        QRIS - QR Code Pembayaran
+      </div>
+      <div class="qris-body">
+        <div class="qris-logo">
+          <span>Q</span><span>R</span><span>I</span><span>S</span>
+        </div>
+        <div style="margin: 15px 0;">
+          <canvas id="qris-canvas" width="220" height="220" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff;"></canvas>
+        </div>
+        <p style="font-size: 0.8rem; color: #666; font-weight: 500;">
+          Penyedia Jasa Pembayaran: BusGo Payment Gateway<br>
+          NMID: ID1020304050607
+        </p>
+      </div>
+
+      <!-- Instructions card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h4 style="margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Petunjuk Pembayaran</h4>
+        <div class="instruction-step">
+          <div class="instruction-num">1</div>
+          <div>Buka aplikasi pembayaran pilihan Anda (GoPay, OVO, DANA, LinkAja, BCA, dll).</div>
+        </div>
+        <div class="instruction-step">
+          <div class="instruction-num">2</div>
+          <div>Pilih opsi <strong>Scan / Bayar / QRIS</strong> pada aplikasi tersebut.</div>
+        </div>
+        <div class="instruction-step">
+          <div class="instruction-num">3</div>
+          <div>Arahkan kamera ke QR Code di atas atau upload tangkapan layar (screenshot) QR Code ini.</div>
+        </div>
+        <div class="instruction-step">
+          <div class="instruction-num">4</div>
+          <div>Periksa detail transaksi, pastikan nama merchant adalah <strong>BusGo</strong> dan nominal sesuai.</div>
+        </div>
+        <div class="instruction-step">
+          <div class="instruction-num">5</div>
+          <div>Masukkan PIN Anda dan selesaikan transaksi.</div>
+        </div>
+      </div>
+
+      <button id="pay-btn" class="btn btn-primary btn-lg" style="margin-bottom: 2rem;">
+        <i class="bi bi-shield-check"></i> Saya Sudah Bayar
+      </button>
+    </div>
+
+    <!-- Screen 2: Processing Verification -->
+    <div id="screen-loading" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div class="payment-spinner"></div>
+        <h3 style="color: var(--primary); margin-bottom: 0.5rem;">Memverifikasi Pembayaran...</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Sistem sedang mendeteksi transaksi QRIS Anda secara otomatis.</p>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1.5rem;">Mohon jangan menutup atau memuat ulang halaman ini.</p>
+      </div>
+    </div>
+
+    <!-- Screen 3: Success Notification -->
+    <div id="screen-success" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <i class="bi bi-check-circle-fill" style="font-size: 4.5rem; color: var(--success); display: block; margin-bottom: 1.5rem; animation: pulse-animation 2s infinite;"></i>
+        <h2 style="color: var(--success); margin-bottom: 0.5rem;">Pembayaran Berhasil!</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Terima kasih, pembayaran Anda telah diverifikasi oleh sistem.</p>
+        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 8px; font-size: 0.9rem; color: var(--success); font-weight: 600; margin-bottom: 1.5rem;">
+          E-Tiket Anda telah aktif dan siap digunakan.
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Mengalihkan Anda ke halaman Tiket Saya dalam beberapa saat...</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="assets/js/storage.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Authenticate & load ticket
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      let ticket = null;
+      const sessionData = sessionStorage.getItem('busgo_pending_ticket');
+      if (sessionData) {
+        ticket = JSON.parse(sessionData);
+      } else {
+        const userTickets = storage.getUserTickets();
+        if (userTickets.length > 0) {
+          const pendingTickets = userTickets.filter(t => t.statusTiket === 'pending');
+          if (pendingTickets.length > 0) {
+            pendingTickets.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            ticket = pendingTickets[0];
+          }
+        }
+      }
+
+      if (!ticket) {
+        alert("Data tiket pending tidak ditemukan!");
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Fill in UI
+      document.getElementById("ticket-id").textContent = ticket.id;
+      document.getElementById("total-amount").textContent = `Rp ${ticket.total.toLocaleString("id-ID")}`;
+      document.getElementById("back-btn").href = `booking.html?scheduleId=${ticket.scheduleId}`;
+
+      // 2. Start Countdown Timer (15:00 minutes)
+      let secondsRemaining = 15 * 60;
+      const countdownEl = document.getElementById("countdown");
+      
+      const timerInterval = setInterval(() => {
+        secondsRemaining--;
+        const mins = Math.floor(secondsRemaining / 60);
+        const secs = secondsRemaining % 60;
+        
+        countdownEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (secondsRemaining <= 0) {
+          clearInterval(timerInterval);
+          alert("Waktu pembayaran telah habis!");
+          window.location.href = "index.html";
+        }
+      }, 1000);
+
+      // 3. Render Fake QRIS QR Code on Canvas
+      const canvas = document.getElementById("qris-canvas");
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        const size = canvas.width;
+        const matrixSize = 21; // 21x21 grid
+        const cellSize = size / matrixSize;
+
+        // Simple predictable hashing of ticket ID for unique-looking QR code
+        let seed = 0;
+        for (let i = 0; i < ticket.id.length; i++) {
+          seed += ticket.id.charCodeAt(i);
+        }
+        const pseudoRandom = () => {
+          const x = Math.sin(seed++) * 10000;
+          return x - Math.floor(x);
+        };
+
+        // Draw background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, size, size);
+
+        // Draw pixels
+        ctx.fillStyle = "#000000";
+        for (let r = 0; r < matrixSize; r++) {
+          for (let c = 0; c < matrixSize; c++) {
+            // Corner position detection patterns
+            const isFinder = 
+              (r < 7 && c < 7) || // Top Left
+              (r < 7 && c >= matrixSize - 7) || // Top Right
+              (r >= matrixSize - 7 && c < 7); // Bottom Left
+
+            if (isFinder) {
+              // Draw Finder Pattern
+              const localR = r < 7 ? r : r - (matrixSize - 7);
+              const localC = c < 7 ? c : c - (matrixSize - 7);
+              const border = localR === 0 || localR === 6 || localC === 0 || localC === 6 ||
+                             (localR >= 2 && localR <= 4 && localC >= 2 && localC <= 4);
+              if (border) {
+                ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+              }
+            } else {
+              // Draw random payload blocks
+              if (pseudoRandom() > 0.45) {
+                ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Handle "Saya Sudah Bayar" Button Action
+      document.getElementById("pay-btn").addEventListener("click", () => {
+        // Stop timer
+        clearInterval(timerInterval);
+        
+        // Show Loading Screen
+        document.getElementById("screen-details").classList.remove("active");
+        document.getElementById("screen-loading").classList.add("active");
+        
+        // Simulate checking payment (2 seconds)
+        setTimeout(() => {
+          // Confirm payment in storage
+          storage.confirmTicket(ticket.id);
+          
+          // Clear pending session ticket
+          sessionStorage.removeItem('busgo_pending_ticket');
+          
+          // Show Success Screen
+          document.getElementById("screen-loading").classList.remove("active");
+          document.getElementById("screen-success").classList.add("active");
+          
+          // Redirect to my-tickets.html after 2 seconds
+          setTimeout(() => {
+            window.location.href = "my-tickets.html";
+          }, 2000);
+        }, 2000);
+      });
+    });
+  </script>
+
+</body>
+</html>

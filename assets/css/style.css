@@ -1,0 +1,479 @@
+:root {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --primary: #f97316;
+  --primary-hover: #ea580c;
+  --secondary: #0ea5e9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: var(--font-family);
+  line-height: 1.5;
+  padding-bottom: 70px; /* space for bottom nav */
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Header & Container */
+.app-header {
+  background-color: var(--card-bg);
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-brand {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+  margin-bottom: 0.75rem;
+}
+
+/* Form inputs */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--border);
+  color: var(--text-main);
+}
+
+.btn-secondary:hover {
+  background-color: #475569;
+}
+
+/* Card components */
+.card {
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Bottom Navigation Bar */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: var(--card-bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 1000;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 1;
+  padding: 0.5rem 0;
+}
+
+.nav-item i {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.nav-item.active {
+  color: var(--primary);
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-success { background-color: var(--success); color: #fff; }
+.badge-warning { background-color: var(--warning); color: #fff; }
+.badge-secondary { background-color: var(--border); color: var(--text-muted); }
+
+/* Schedule items */
+.schedule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.schedule-main {
+  flex: 1;
+}
+
+.schedule-meta {
+  text-align: right;
+}
+
+.schedule-time {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+/* Ticket Details */
+.ticket-card {
+  border-left: 4px solid var(--primary);
+}
+
+.ticket-header {
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.ticket-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.ticket-label {
+  color: var(--text-muted);
+}
+
+.ticket-value {
+  font-weight: 600;
+}
+
+/* Map screen */
+#map {
+  width: 100%;
+  height: calc(100vh - 130px);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.map-control-panel {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 500px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  z-index: 1000;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+}
+
+.eta-counter {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-align: center;
+  margin: 0.25rem 0;
+}
+
+/* Animations */
+.pulse {
+  animation: pulse-animation 2s infinite;
+}
+
+@keyframes pulse-animation {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+  .container {
+    width: 100%;
+    max-width: none;
+    padding: 0.75rem;
+  }
+
+  .app-header {
+    padding: 0.75rem;
+  }
+
+  .app-brand {
+    font-size: 1.25rem;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 10px;
+  }
+
+  .schedule-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .schedule-meta {
+    text-align: left;
+  }
+
+  .ticket-header,
+  .ticket-row {
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+
+  .ticket-value {
+    width: 100%;
+    word-break: break-word;
+  }
+
+  .btn {
+    padding: 0.7rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  table {
+    min-width: 640px;
+  }
+
+  .bottom-nav {
+    height: 64px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.1rem; }
+
+  .form-control {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.95rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .schedule-time {
+    font-size: 1.1rem;
+  }
+
+  #map {
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .map-control-panel {
+    width: calc(100vw - 16px);
+    left: 8px;
+    right: 8px;
+    transform: none;
+    bottom: 8px;
+    padding: 0.75rem;
+    max-width: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .container {
+    max-width: 760px;
+  }
+
+  .schedule-item {
+    gap: 1rem;
+  }
+}
+
+/* Toast Notification Styles */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.custom-toast {
+  background: #1e293b;
+  color: white;
+  border-left: 4px solid var(--primary);
+  padding: 12px 20px;
+  border-radius: 6px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 250px;
+  max-width: 350px;
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+.custom-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.custom-toast.success {
+  border-left-color: var(--success);
+}
+
+.custom-toast.error {
+  border-left-color: #ef4444;
+}
+
+.custom-toast.info {
+  border-left-color: #3b82f6;
+}
+
+/* Print Styles for Boarding Pass */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .ticket-card.print-only, .ticket-card.print-only * {
+    visibility: visible;
+  }
+  .ticket-card.print-only {
+    position: absolute;
+    left: 50% !important;
+    top: 20px !important;
+    transform: translateX(-50%) !important;
+    width: 100% !important;
+    max-width: 450px !important;
+    border: 1.5px solid #000 !important;
+    background: white !important;
+    box-shadow: none !important;
+    color: black !important;
+    padding: 24px !important;
+    border-radius: 8px !important;
+  }
+  .ticket-card.print-only .ticket-value {
+    color: black !important;
+  }
+  .ticket-card.print-only .ticket-label {
+    color: #555 !important;
+  }
+  .ticket-card.print-only canvas {
+    border: 1px solid #000 !important;
+    display: block !important;
+    margin: 10px auto !important;
+  }
+  .ticket-card.print-only .ticket-header strong {
+    color: #000 !important;
+  }
+  .ticket-card.print-only button, .ticket-card.print-only .btn {
+    display: none !important;
+  }
+}

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Tiket — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+
+  <style>
+    /* Payment Method Styles */
+    .payment-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+    .payment-option {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s;
+    }
+    .payment-option:hover {
+      border-color: var(--primary);
+      background: rgba(249, 115, 22, 0.05);
+    }
+    .payment-option.active {
+      border-color: var(--primary);
+      background: rgba(249, 115, 22, 0.1);
+      box-shadow: 0 0 10px rgba(249, 115, 22, 0.2);
+    }
+    .payment-option i {
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+    .payment-option-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .payment-option-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    
+    /* Payment Gateway Modal */
+    .payment-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(5px);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .payment-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .payment-modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 450px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    .payment-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(249, 115, 22, 0.1);
+      border-left-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+  </header>
+
+  <main class="container">
+    <div style="margin-bottom: 1rem;">
+      <a href="index.html" style="color: var(--text-muted); font-size: 0.9rem;">
+        <i class="bi bi-chevron-left"></i> Kembali ke Pencarian
+      </a>
+    </div>
+
+    <!-- Detail Perjalanan Card -->
+    <section class="card" id="detail-bus-card">
+      <h3 style="color: var(--primary); display: flex; justify-content: space-between; align-items: center;">
+        <span>Detail Keberangkatan</span>
+        <span id="seat-availability-badge" class="badge badge-success">Sisa Kursi: --</span>
+      </h3>
+      <div id="sch-details">
+        <!-- Rendered JS -->
+      </div>
+    </section>
+
+    <!-- Form Data Penumpang -->
+    <section class="card">
+      <h3>Data Penumpang</h3>
+      <form id="booking-form">
+        <div class="form-group">
+          <label class="form-label" for="nama">Nama Lengkap</label>
+          <input class="form-control" type="text" id="nama" placeholder="Masukkan nama penumpang..." required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="hp">No. Handphone / WhatsApp</label>
+          <input class="form-control" type="tel" id="hp" placeholder="Contoh: 081234567890" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="kursi">Jumlah Penumpang / Tiket</label>
+          <select class="form-control" id="kursi" required>
+            <option value="1">1 Penumpang</option>
+            <option value="2">2 Penumpang</option>
+            <option value="3">3 Penumpang</option>
+            <option value="4">4 Penumpang</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 1.5rem;">
+          <label class="form-label">Pilih Kursi (Interaktif)</label>
+          <div id="visual-seat-picker-container" style="margin-bottom: 0.5rem;">
+            <!-- Rendered by seat-selector.js -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Metode Pembayaran</label>
+          <input type="hidden" id="payment-method-input" value="qris" required>
+          <div class="payment-options">
+            <div class="payment-option active" data-method="qris">
+              <i class="bi bi-qr-code-scan"></i>
+              <div>
+                <div class="payment-option-title">QRIS</div>
+                <div class="payment-option-desc">Gopay, OVO, DANA, LinkAja</div>
+              </div>
+            </div>
+            <div class="payment-option" data-method="va_bca">
+              <i class="bi bi-bank"></i>
+              <div>
+                <div class="payment-option-title">BCA Virtual Account</div>
+                <div class="payment-option-desc">Transfer Bank BCA</div>
+              </div>
+            </div>
+            <div class="payment-option" data-method="va_mandiri">
+              <i class="bi bi-bank2"></i>
+              <div>
+                <div class="payment-option-title">Mandiri Bill</div>
+                <div class="payment-option-desc">Transfer Bank Mandiri</div>
+              </div>
+            </div>
+            <div class="payment-option" data-method="ewallet_dana">
+              <i class="bi bi-wallet2"></i>
+              <div>
+                <div class="payment-option-title">DANA</div>
+                <div class="payment-option-desc">Pembayaran Instan</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin: 1.5rem 0; font-size: 1.25rem; display: flex; justify-content: space-between;">
+          <span>Total Pembayaran:</span>
+          <strong style="color: var(--success);" id="total-pembayaran">Rp 0</strong>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="bi bi-shield-check"></i> Bayar Sekarang
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/seat-selector.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check Auth
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      // Pre-fill name if available
+      document.getElementById("nama").value = currentUser.name || "";
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const scheduleId = urlParams.get("scheduleId");
+      
+      if (!scheduleId) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Parse schedule parameters from ID (e.g. SCH-R1-0-20260618 or custom uuid)
+      let sch = null;
+      
+      if (scheduleId.startsWith("SCH-")) {
+        const parts = scheduleId.split("-");
+        const routeId = parts[1];
+        const index = parts[2];
+        const dateStr = parts[3];
+        const formattedDate = `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}`;
+        const schedules = generateSchedulesForDate(formattedDate);
+        sch = schedules.find(s => s.id === scheduleId);
+      } else {
+        // Fallback or custom admin schedules search
+        // Check local storage schedules
+        const customSchedules = storage.getCustomSchedules();
+        const foundCustom = customSchedules.find(s => s.id === scheduleId);
+        if (foundCustom) {
+          const schedules = generateSchedulesForDate(foundCustom.tanggal);
+          sch = schedules.find(s => s.id === scheduleId);
+        }
+      }
+
+      if (!sch) {
+        alert("Jadwal tidak ditemukan!");
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Render schedule details
+      const detailsDiv = document.getElementById("sch-details");
+      detailsDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+          <div>
+            <strong style="font-size: 1.2rem; display: block;">${sch.routeName}</strong>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">${sch.ruteAwal} ➔ ${sch.ruteAkhir}</span>
+          </div>
+          <span class="badge badge-warning">${sch.busNomor}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <div>
+            <span style="color: var(--text-muted); display: block;">Tanggal</span>
+            <strong>${sch.tanggal}</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted); display: block;">Waktu</span>
+            <strong>${sch.jamBerangkat} - ${sch.jamSampai} WIB</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted); display: block;">Tipe Bus</span>
+            <strong>${sch.busTipe}</strong>
+          </div>
+        </div>
+      `;
+
+      // Update seat availability badge
+      const updateSeatsBadge = () => {
+        const available = storage.getAvailableSeats(sch.id);
+        const badgeEl = document.getElementById("seat-availability-badge");
+        badgeEl.textContent = `Sisa Kursi: ${available}`;
+        if (available === 0) {
+          badgeEl.className = "badge badge-danger";
+          badgeEl.style.backgroundColor = "#ef4444";
+        } else if (available < 5) {
+          badgeEl.className = "badge badge-warning";
+          badgeEl.style.backgroundColor = "var(--warning)";
+        } else {
+          badgeEl.className = "badge badge-success";
+          badgeEl.style.backgroundColor = "var(--success)";
+        }
+      };
+      updateSeatsBadge();
+
+      // Element references
+      const kursiSelect = document.getElementById("kursi");
+      const totalText = document.getElementById("total-pembayaran");
+      const basePrice = sch.harga;
+
+      // Visual Seat Selector initialization
+      let selectedSeats = [];
+      const renderSeatPicker = () => {
+        const qty = parseInt(kursiSelect.value);
+        BusSeatSelector.render(document.getElementById("visual-seat-picker-container"), {
+          busTipe: sch.busTipe,
+          scheduleId: sch.id,
+          maxSeats: qty,
+          onChange: (seats) => {
+            selectedSeats = seats;
+          }
+        });
+      };
+
+      // Price calculation and updates
+      const updateTotal = () => {
+        const qty = parseInt(kursiSelect.value);
+        totalText.textContent = `Rp ${(basePrice * qty).toLocaleString("id-ID")}`;
+      };
+      
+      kursiSelect.addEventListener("change", () => {
+        selectedSeats = [];
+        updateTotal();
+        renderSeatPicker();
+      });
+
+      // Initial layout execution
+      updateTotal();
+      renderSeatPicker();
+
+      // Payment method selection (only one active at a time)
+      const paymentOptions = document.querySelectorAll('.payment-option');
+      paymentOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+          paymentOptions.forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+          document.getElementById('payment-method-input').value = opt.dataset.method;
+        });
+      });
+
+      // Submit booking → redirect to payment page
+            document.getElementById("booking-form").addEventListener("submit", (e) => {
+              e.preventDefault();
+        
+              const nama = document.getElementById("nama").value;
+              const hp = document.getElementById("hp").value;
+              const qty = parseInt(kursiSelect.value);
+
+              if (selectedSeats.length !== qty) {
+                alert(`Silakan pilih tepat ${qty} nomor kursi pada peta bus!`);
+                return;
+              }
+
+              if (!storage.checkSeatAvailability(sch.id, qty)) {
+                const available = storage.getAvailableSeats(sch.id);
+                alert(`Maaf, kursi tidak cukup! Sisa kursi tersedia: ${available}`);
+                return;
+              }
+        
+              const cleanDateStr = sch.tanggal.replace(/-/g, "");
+              const ticketId = `BG-${cleanDateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
+        
+              const newTicket = {
+                id: ticketId,
+                ticketId: ticketId,
+                scheduleId: sch.id,
+                busNomor: sch.busNomor,
+                rute: sch.routeName,
+                ruteAwal: sch.ruteAwal,
+                ruteAkhir: sch.ruteAkhir,
+                tanggal: sch.tanggal,
+                jamBerangkat: sch.jamBerangkat,
+                jamSampai: sch.jamSampai,
+                namaPenumpang: nama,
+                hp: hp,
+                jumlahKursi: qty,
+                selectedSeats: selectedSeats,
+                harga: basePrice,
+                total: basePrice * qty,
+                statusTiket: "pending",
+                createdAt: new Date().toISOString()
+              };
+
+              // Save pending ticket to storage for payment pages to confirm
+              storage.saveTicket(newTicket);
+        
+              // Store payment data in session for the payment page
+              sessionStorage.setItem('busgo_pending_ticket', JSON.stringify(newTicket));
+        
+              // Redirect to appropriate payment page based on method
+              const method = document.getElementById('payment-method-input').value;
+              const paymentPages = {
+                'qris': 'payment-qris.html',
+                'va_bca': 'payment-bca.html',
+                'va_mandiri': 'payment-mandiri.html',
+                'ewallet_dana': 'payment-dana.html'
+              };
+        
+              const targetPage = paymentPages[method] || 'payment-qris.html';
+              window.location.href = targetPage;
+            });
+          });
+  </script>
+
+  <!-- Payment Simulation Gateway Modal -->
+  <div id="payment-gateway-modal" class="payment-modal">
+    <div class="payment-modal-card">
+      <h3 style="margin-bottom: 5px;" id="modal-gateway-title">Secure Payment Gateway</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem;" id="modal-gateway-order-id">ORDER ID: --</p>
+      
+      <!-- Screen 1: Payment Instructions -->
+      <div id="screen-instructions">
+        <div id="payment-details-container" style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid var(--border);">
+          <!-- Dynamic based on payment method -->
+        </div>
+        <button class="btn btn-primary" onclick="proceedToVerifyPayment()" style="width: 100%;">Saya Sudah Bayar</button>
+      </div>
+
+      <!-- Screen 2: Verification Loading -->
+      <div id="screen-loading" style="display: none;">
+        <p style="margin-top: 15px;">Memverifikasi pembayaran Anda...</p>
+        <div class="payment-spinner"></div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Mohon jangan menutup halaman ini</p>
+      </div>
+
+      <!-- Screen 3: Success Notification -->
+      <div id="screen-success" style="display: none;">
+        <i class="bi bi-check-circle-fill" style="font-size: 3.5rem; color: var(--success); display: block; margin: 15px 0;"></i>
+        <h4 style="color: var(--success);">Pembayaran Berhasil!</h4>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">E-Tiket Anda telah diterbitkan dan ditambahkan ke daftar tiket Anda.</p>
+        <button class="btn btn-primary" onclick="finishBookingFlow()" style="width: 100%;">Lihat Tiket Saya</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

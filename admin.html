@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .tab-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .admin-tab-content {
+      display: none;
+    }
+    .admin-tab-content.active {
+      display: block;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      max-width: 500px;
+      width: 90%;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo Admin Panel
+    </div>
+    <div class="header-profile" style="display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+      <span>Halo, <b id="admin-name">Admin</b></span>
+      <button onclick="logoutAdmin()" class="btn" style="padding: 4px 8px; font-size: 0.8rem; width: auto; background: rgba(255,255,255,0.1); border: 1px solid var(--border);">Logout</button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width: 900px;">
+    <h2>Manajemen Operasional Bus</h2>
+    
+    <!-- Tab Controls -->
+    <div style="display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap;">
+      <button class="tab-btn active" onclick="switchTab('tab-schedules')"><i class="bi bi-calendar3"></i> Jadwal</button>
+      <button class="tab-btn" onclick="switchTab('tab-buses')"><i class="bi bi-bus-front"></i> Bus</button>
+      <button class="tab-btn" onclick="switchTab('tab-routes')"><i class="bi bi-map"></i> Rute</button>
+      <button class="tab-btn" onclick="switchTab('tab-io')"><i class="bi bi-arrow-left-right"></i> Import/Export JSON</button>
+    </div>
+
+    <!-- TAB: SCHEDULES -->
+    <section id="tab-schedules" class="admin-tab-content active">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+        <div class="card">
+          <h3 id="schedule-form-title"><i class="bi bi-calendar-plus"></i> Tambah Jadwal Bus Baru</h3>
+          <form id="add-schedule-form">
+            <input type="hidden" id="edit-sched-id">
+            <div class="form-group">
+              <label class="form-label" for="sched-route">Rute</label>
+              <select class="form-control" id="sched-route" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sched-bus">Bus</label>
+              <select class="form-control" id="sched-bus" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sched-date">Tanggal</label>
+              <input class="form-control" type="date" id="sched-date" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label class="form-label" for="sched-time-start">Jam Berangkat</label>
+                <input class="form-control" type="time" id="sched-time-start" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sched-time-end">Jam Sampai (ETA)</label>
+                <input class="form-control" type="time" id="sched-time-end" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sched-price">Harga Tiket (Rp)</label>
+              <input class="form-control" type="number" id="sched-price" placeholder="Contoh: 120000" required>
+            </div>
+            <button type="submit" id="sched-submit-btn" class="btn btn-primary">
+              <i class="bi bi-plus-circle"></i> Rilis Jadwal Baru
+            </button>
+            <button type="button" id="sched-cancel-btn" class="btn btn-secondary" style="margin-top: 10px; display: none;" onclick="resetScheduleForm()">
+              Batal Edit
+            </button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3><i class="bi bi-table"></i> Daftar Jadwal Tambahan (Admin)</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                  <th>ID</th>
+                  <th>Rute / Bus</th>
+                  <th>Waktu</th>
+                  <th>Harga</th>
+                  <th style="text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="schedules-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: BUSES -->
+    <section id="tab-buses" class="admin-tab-content">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+        <div class="card">
+          <h3 id="bus-form-title"><i class="bi bi-plus-circle"></i> Tambah Bus Baru</h3>
+          <form id="bus-form">
+            <input type="hidden" id="edit-bus-id">
+            <div class="form-group">
+              <label class="form-label" for="bus-nomor">Nomor Plat</label>
+              <input class="form-control" type="text" id="bus-nomor" placeholder="Contoh: B 7001 VIP" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="bus-tipe">Tipe Bus</label>
+              <input class="form-control" type="text" id="bus-tipe" placeholder="Contoh: Executive AC, Sleeper Bus" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="bus-kapasitas">Kapasitas Kursi</label>
+              <input class="form-control" type="number" id="bus-kapasitas" value="30" required>
+            </div>
+            <button type="submit" id="bus-submit-btn" class="btn btn-primary">Simpan Bus</button>
+            <button type="button" id="bus-cancel-btn" class="btn btn-secondary" style="margin-top: 10px; display: none;" onclick="resetBusForm()">Batal</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3><i class="bi bi-list-ul"></i> Daftar Armada Bus</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                  <th>ID</th>
+                  <th>Nomor Plat</th>
+                  <th>Tipe</th>
+                  <th>Kapasitas</th>
+                  <th style="text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="buses-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: ROUTES -->
+    <section id="tab-routes" class="admin-tab-content">
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
+        <div class="card">
+          <h3 id="route-form-title"><i class="bi bi-map-fill"></i> Tambah Rute Baru</h3>
+          <form id="route-form">
+            <input type="hidden" id="edit-route-id">
+            <div class="form-group">
+              <label class="form-label" for="route-nama">Nama Rute</label>
+              <input class="form-control" type="text" id="route-nama" placeholder="Contoh: Jakarta - Bandung" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="route-awal">Terminal Keberangkatan</label>
+              <input class="form-control" type="text" id="route-awal" placeholder="Contoh: Terminal Kalideres" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="route-akhir">Terminal Kedatangan</label>
+              <input class="form-control" type="text" id="route-akhir" placeholder="Contoh: Terminal Lebak Siliwangi" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="route-estimasi">Estimasi Waktu (Menit)</label>
+              <input class="form-control" type="number" id="route-estimasi" placeholder="Contoh: 180" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="route-coords">Koordinat Rute (Format JSON Array Coords)</label>
+              <textarea class="form-control" id="route-coords" placeholder="[[-6.1601, 106.7029], [-6.8904, 107.6106]]" required style="font-family: monospace; height: 100px;"></textarea>
+            </div>
+            <button type="submit" id="route-submit-btn" class="btn btn-primary">Simpan Rute</button>
+            <button type="button" id="route-cancel-btn" class="btn btn-secondary" style="margin-top: 10px; display: none;" onclick="resetRouteForm()">Batal</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3><i class="bi bi-map"></i> Daftar Rute Aktif</h3>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                  <th>ID</th>
+                  <th>Nama Rute</th>
+                  <th>Terminal Awal & Akhir</th>
+                  <th>Estimasi</th>
+                  <th style="text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="routes-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: IMPORT/EXPORT JSON -->
+    <section id="tab-io" class="admin-tab-content">
+      <div class="card">
+        <h3><i class="bi bi-download"></i> Export Data Aplikasi</h3>
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">Klik tombol di bawah untuk menyalin atau mendownload seluruh database (Users, Tickets, Custom Schedules, Custom Routes, dan Custom Buses) dalam format JSON string.</p>
+        <button class="btn btn-primary" onclick="triggerExport()"><i class="bi bi-clipboard"></i> Salin JSON ke Clipboard</button>
+        <textarea id="export-area" readonly class="form-control" style="margin-top: 1rem; height: 150px; font-family: monospace; font-size: 0.85rem;"></textarea>
+      </div>
+
+      <div class="card" style="margin-top: 1.5rem;">
+        <h3><i class="bi bi-upload"></i> Import Data Aplikasi</h3>
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">Tempel JSON string hasil export di bawah ini untuk memulihkan seluruh data aplikasi Anda.</p>
+        <textarea id="import-area" class="form-control" placeholder="Tempel data JSON di sini..." style="height: 150px; font-family: monospace; font-size: 0.85rem;"></textarea>
+        <button class="btn btn-primary" onclick="triggerImport()" style="margin-top: 1rem; background-color: var(--success);"><i class="bi bi-check-circle"></i> Proses Import</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script>
+    function logoutAdmin() {
+      storage.logout();
+      window.location.href = "login.html";
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.admin-tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check Admin authorization
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser || currentUser.role !== "admin") {
+        alert("Akses ditolak! Halaman ini hanya untuk Administrator.");
+        window.location.href = "login.html";
+        return;
+      }
+
+      document.getElementById("admin-name").textContent = currentUser.name;
+
+      // Populate Select Option Helpers
+      function populateOptions() {
+        // Populate Route Options
+        const routeSelect = document.getElementById("sched-route");
+        routeSelect.innerHTML = "";
+        getRoutes().forEach(r => {
+          const opt = document.createElement("option");
+          opt.value = r.id;
+          opt.textContent = `${r.nama} (${r.awal} ➔ ${r.akhir})`;
+          routeSelect.appendChild(opt);
+        });
+
+        // Populate Bus Options
+        const busSelect = document.getElementById("sched-bus");
+        busSelect.innerHTML = "";
+        getBuses().forEach(b => {
+          const opt = document.createElement("option");
+          opt.value = `${b.id}|${b.nomor}|${b.tipe}`;
+          opt.textContent = `${b.nomor} - ${b.tipe}`;
+          busSelect.appendChild(opt);
+        });
+      }
+
+      // --- CRUD SCHEDULE ---
+      const renderSchedulesTable = () => {
+        const customSchedules = storage.getCustomSchedules();
+        const tbody = document.getElementById("schedules-table-body");
+        tbody.innerHTML = "";
+
+        if (customSchedules.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                Belum ada jadwal kustom yang dibuat.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        customSchedules.forEach(s => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="font-weight: bold; color: var(--primary);">${s.id}</td>
+            <td>
+              <div>${s.routeName}</div>
+              <small style="color: var(--text-muted);">${s.busNomor} (${s.busTipe})</small>
+            </td>
+            <td>
+              <div>${s.tanggal}</div>
+              <small>${s.jamBerangkat} - ${s.jamSampai} WIB</small>
+            </td>
+            <td>Rp ${Number(s.harga).toLocaleString("id-ID")}</td>
+            <td style="text-align: center;">
+              <button onclick="editSchedule('${s.id}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; width: auto; margin-right: 5px;">
+                Edit
+              </button>
+              <button onclick="deleteSched('${s.id}')" class="btn" style="background: #ef4444; color: white; padding: 4px 8px; font-size: 0.8rem; width: auto;">
+                Hapus
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      };
+
+      document.getElementById("add-schedule-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const editId = document.getElementById("edit-sched-id").value;
+        const routeId = document.getElementById("sched-route").value;
+        const [busId, busNo, busType] = document.getElementById("sched-bus").value.split("|");
+        const date = document.getElementById("sched-date").value;
+        const timeStart = document.getElementById("sched-time-start").value;
+        const timeEnd = document.getElementById("sched-time-end").value;
+        const price = parseInt(document.getElementById("sched-price").value);
+
+        const routeObj = getRoutes().find(r => r.id === routeId);
+
+        let customSchedules = storage.getCustomSchedules();
+
+        if (editId) {
+          // Edit Mode
+          const idx = customSchedules.findIndex(s => s.id === editId);
+          if (idx !== -1) {
+            customSchedules[idx] = {
+              id: editId,
+              routeId: routeId,
+              routeName: routeObj.nama,
+              ruteAwal: routeObj.awal,
+              ruteAkhir: routeObj.akhir,
+              busId: busId,
+              busNomor: busNo,
+              busTipe: busType,
+              tanggal: date,
+              jamBerangkat: timeStart,
+              jamSampai: timeEnd,
+              harga: price
+            };
+            localStorage.setItem("busgo_custom_schedules", JSON.stringify(customSchedules));
+            alert("Jadwal sukses diperbarui!");
+          }
+        } else {
+          // Add Mode
+          const cleanDate = date.replace(/-/g, "");
+          const customId = `ADM-${routeId}-${Math.floor(100 + Math.random() * 900)}-${cleanDate}`;
+          const newSched = {
+            id: customId,
+            routeId: routeId,
+            routeName: routeObj.nama,
+            ruteAwal: routeObj.awal,
+            ruteAkhir: routeObj.akhir,
+            busId: busId,
+            busNomor: busNo,
+            busTipe: busType,
+            tanggal: date,
+            jamBerangkat: timeStart,
+            jamSampai: timeEnd,
+            harga: price
+          };
+          storage.saveCustomSchedule(newSched);
+          alert("Jadwal sukses dirilis!");
+        }
+
+        resetScheduleForm();
+        renderSchedulesTable();
+      });
+
+      window.editSchedule = (id) => {
+        const sched = storage.getCustomSchedules().find(s => s.id === id);
+        if (!sched) return;
+
+        document.getElementById("edit-sched-id").value = sched.id;
+        document.getElementById("sched-route").value = sched.routeId;
+        document.getElementById("sched-bus").value = `${sched.busId}|${sched.busNomor}|${sched.busTipe}`;
+        document.getElementById("sched-date").value = sched.tanggal;
+        document.getElementById("sched-time-start").value = sched.jamBerangkat;
+        document.getElementById("sched-time-end").value = sched.jamSampai;
+        document.getElementById("sched-price").value = sched.harga;
+
+        document.getElementById("schedule-form-title").innerHTML = `<i class="bi bi-pencil-square"></i> Edit Jadwal ${id}`;
+        document.getElementById("sched-submit-btn").textContent = "Simpan Perubahan Jadwal";
+        document.getElementById("sched-cancel-btn").style.display = "inline-flex";
+      };
+
+      window.resetScheduleForm = () => {
+        document.getElementById("add-schedule-form").reset();
+        document.getElementById("edit-sched-id").value = "";
+        document.getElementById("schedule-form-title").innerHTML = `<i class="bi bi-calendar-plus"></i> Tambah Jadwal Bus Baru`;
+        document.getElementById("sched-submit-btn").innerHTML = `<i class="bi bi-plus-circle"></i> Rilis Jadwal Baru`;
+        document.getElementById("sched-cancel-btn").style.display = "none";
+      };
+
+      window.deleteSched = (id) => {
+        if (confirm(`Hapus jadwal ${id}?`)) {
+          storage.deleteCustomSchedule(id);
+          renderSchedulesTable();
+        }
+      };
+
+
+      // --- CRUD BUS ---
+      const renderBusesTable = () => {
+        const buses = getBuses();
+        const tbody = document.getElementById("buses-table-body");
+        tbody.innerHTML = "";
+
+        buses.forEach(b => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="font-weight: bold;">${b.id}</td>
+            <td>${b.nomor}</td>
+            <td>${b.tipe}</td>
+            <td>${b.kapasitas} Kursi</td>
+            <td style="text-align: center;">
+              <button onclick="editBus('${b.id}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; width: auto; margin-right: 5px;">
+                Edit
+              </button>
+              <button onclick="deleteBus('${b.id}')" class="btn" style="background: #ef4444; color: white; padding: 4px 8px; font-size: 0.8rem; width: auto;">
+                Hapus
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      };
+
+      document.getElementById("bus-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const editId = document.getElementById("edit-bus-id").value;
+        const nomor = document.getElementById("bus-nomor").value;
+        const tipe = document.getElementById("bus-tipe").value;
+        const kapasitas = parseInt(document.getElementById("bus-kapasitas").value);
+
+        let customBuses = storage.getCustomBuses();
+        if (!customBuses) {
+          customBuses = [...DEFAULT_BUSES];
+        }
+
+        if (editId) {
+          const idx = customBuses.findIndex(b => b.id === editId);
+          if (idx !== -1) {
+            customBuses[idx] = { id: editId, nomor, tipe, kapasitas };
+            storage.saveCustomBuses(customBuses);
+            alert("Data bus sukses diperbarui!");
+          }
+        } else {
+          const newId = `B${customBuses.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
+          customBuses.push({ id: newId, nomor, tipe, kapasitas });
+          storage.saveCustomBuses(customBuses);
+          alert("Bus sukses ditambahkan!");
+        }
+
+        resetBusForm();
+        renderBusesTable();
+        populateOptions();
+      });
+
+      window.editBus = (id) => {
+        const bus = getBuses().find(b => b.id === id);
+        if (!bus) return;
+
+        document.getElementById("edit-bus-id").value = bus.id;
+        document.getElementById("bus-nomor").value = bus.nomor;
+        document.getElementById("bus-tipe").value = bus.tipe;
+        document.getElementById("bus-kapasitas").value = bus.kapasitas;
+
+        document.getElementById("bus-form-title").innerHTML = `<i class="bi bi-pencil-square"></i> Edit Bus ${id}`;
+        document.getElementById("bus-submit-btn").textContent = "Simpan Perubahan Bus";
+        document.getElementById("bus-cancel-btn").style.display = "inline-flex";
+      };
+
+      window.resetBusForm = () => {
+        document.getElementById("bus-form").reset();
+        document.getElementById("edit-bus-id").value = "";
+        document.getElementById("bus-form-title").innerHTML = `<i class="bi bi-plus-circle"></i> Tambah Bus Baru`;
+        document.getElementById("bus-submit-btn").textContent = "Simpan Bus";
+        document.getElementById("bus-cancel-btn").style.display = "none";
+      };
+
+      window.deleteBus = (id) => {
+        if (confirm(`Hapus bus ${id}?`)) {
+          let customBuses = storage.getCustomBuses() || [...DEFAULT_BUSES];
+          customBuses = customBuses.filter(b => b.id !== id);
+          storage.saveCustomBuses(customBuses);
+          renderBusesTable();
+          populateOptions();
+        }
+      };
+
+
+      // --- CRUD ROUTE ---
+      const renderRoutesTable = () => {
+        const routes = getRoutes();
+        const tbody = document.getElementById("routes-table-body");
+        tbody.innerHTML = "";
+
+        routes.forEach(r => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="font-weight: bold;">${r.id}</td>
+            <td>${r.nama}</td>
+            <td>
+              <div>${r.awal}</div>
+              <small style="color: var(--text-muted);">${r.akhir}</small>
+            </td>
+            <td>${r.estimasi} Menit</td>
+            <td style="text-align: center;">
+              <button onclick="editRoute('${r.id}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; width: auto; margin-right: 5px;">
+                Edit
+              </button>
+              <button onclick="deleteRoute('${r.id}')" class="btn" style="background: #ef4444; color: white; padding: 4px 8px; font-size: 0.8rem; width: auto;">
+                Hapus
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      };
+
+      document.getElementById("route-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const editId = document.getElementById("edit-route-id").value;
+        const nama = document.getElementById("route-nama").value;
+        const awal = document.getElementById("route-awal").value;
+        const akhir = document.getElementById("route-akhir").value;
+        const estimasi = parseInt(document.getElementById("route-estimasi").value);
+        let coords;
+        
+        try {
+          coords = JSON.parse(document.getElementById("route-coords").value);
+          if (!Array.isArray(coords)) throw new Error("Must be an array of coordinates");
+        } catch (e) {
+          alert("Format koordinat salah! Harus format JSON array valid, contoh: [[-6.12, 106.32], [-6.23, 107.01]]");
+          return;
+        }
+
+        let customRoutes = storage.getCustomRoutes();
+        if (!customRoutes) {
+          customRoutes = [...DEFAULT_ROUTES];
+        }
+
+        if (editId) {
+          const idx = customRoutes.findIndex(r => r.id === editId);
+          if (idx !== -1) {
+            customRoutes[idx] = { id: editId, nama, awal, akhir, estimasi, coords };
+            storage.saveCustomRoutes(customRoutes);
+            alert("Rute sukses diperbarui!");
+          }
+        } else {
+          const newId = `R${customRoutes.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
+          customRoutes.push({ id: newId, nama, awal, akhir, estimasi, coords });
+          storage.saveCustomRoutes(customRoutes);
+          alert("Rute sukses ditambahkan!");
+        }
+
+        resetRouteForm();
+        renderRoutesTable();
+        populateOptions();
+      });
+
+      window.editRoute = (id) => {
+        const r = getRoutes().find(route => route.id === id);
+        if (!r) return;
+
+        document.getElementById("edit-route-id").value = r.id;
+        document.getElementById("route-nama").value = r.nama;
+        document.getElementById("route-awal").value = r.awal;
+        document.getElementById("route-akhir").value = r.akhir;
+        document.getElementById("route-estimasi").value = r.estimasi;
+        document.getElementById("route-coords").value = JSON.stringify(r.coords);
+
+        document.getElementById("route-form-title").innerHTML = `<i class="bi bi-pencil-square"></i> Edit Rute ${id}`;
+        document.getElementById("route-submit-btn").textContent = "Simpan Perubahan Rute";
+        document.getElementById("route-cancel-btn").style.display = "inline-flex";
+      };
+
+      window.resetRouteForm = () => {
+        document.getElementById("route-form").reset();
+        document.getElementById("edit-route-id").value = "";
+        document.getElementById("route-form-title").innerHTML = `<i class="bi bi-map-fill"></i> Tambah Rute Baru`;
+        document.getElementById("route-submit-btn").textContent = "Simpan Rute";
+        document.getElementById("route-cancel-btn").style.display = "none";
+      };
+
+      window.deleteRoute = (id) => {
+        if (confirm(`Hapus rute ${id}?`)) {
+          let customRoutes = storage.getCustomRoutes() || [...DEFAULT_ROUTES];
+          customRoutes = customRoutes.filter(r => r.id !== id);
+          storage.saveCustomRoutes(customRoutes);
+          renderRoutesTable();
+          populateOptions();
+        }
+      };
+
+
+      // --- INITIAL RUN ---
+      populateOptions();
+      renderSchedulesTable();
+      renderBusesTable();
+      renderRoutesTable();
+    });
+
+    // --- IMPORT / EXPORT JS FUNCTIONALITY ---
+    function triggerExport() {
+      const dataStr = storage.exportData();
+      const exportArea = document.getElementById("export-area");
+      exportArea.value = dataStr;
+      exportArea.select();
+      try {
+        document.execCommand("copy");
+        alert("Data JSON sukses disalin ke clipboard!");
+      } catch (err) {
+        alert("Gagal menyalin otomatis, silakan salin teks di textarea secara manual.");
+      }
+    }
+
+    function triggerImport() {
+      const jsonStr = document.getElementById("import-area").value;
+      if (!jsonStr.trim()) {
+        alert("Silakan masukkan data JSON terlebih dahulu!");
+        return;
+      }
+      if (confirm("Mengimport data baru akan menimpa data yang ada saat ini. Lanjutkan?")) {
+        const res = storage.importData(jsonStr);
+        if (res.success) {
+          alert("Import Data Sukses! Halaman akan dimuat ulang.");
+          window.location.reload();
+        } else {
+          alert("Gagal Import: " + res.message);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lacak Perjalanan Bus — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    body {
+      padding-bottom: 0;
+      position: relative;
+      overflow: hidden;
+      height: 100vh;
+      margin: 0;
+    }
+    .back-btn {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1000;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 8px 15px;
+      border-radius: 8px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      text-decoration: none;
+      color: var(--text);
+    }
+    /* Simulation panel for easy demo testing */
+    .sim-panel {
+      display: none !important;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 1000;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      max-width: 280px;
+    }
+    .sim-panel label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .sim-panel select, .sim-panel input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .map-control-panel {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      width: calc(100vw - 30px);
+      max-width: 450px;
+      margin: 0;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 600px) {
+      .back-btn {
+        top: 8px;
+        left: 8px;
+        padding: 6px 10px;
+        font-size: 0.85rem;
+      }
+      .sim-panel {
+        top: 50px;
+        left: 8px;
+        right: 8px;
+        max-width: none;
+        padding: 8px;
+      }
+      .sim-panel select {
+        font-size: 0.75rem;
+      }
+      .map-control-panel {
+        bottom: 8px;
+        width: calc(100vw - 16px);
+        padding: 0.75rem;
+        max-height: 38vh;
+      }
+      .map-control-panel > div:first-child,
+      .map-control-panel > div:last-child {
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      #trip-title {
+        font-size: 0.95rem !important;
+      }
+      #status-desc {
+        font-size: 0.8rem !important;
+      }
+      .eta-counter {
+        font-size: 1.1rem;
+      }
+    }
+    .phase-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .phase-1 { background-color: #3b82f6; color: white; } /* Menuju Terminal */
+    .phase-2 { background-color: #eab308; color: black; } /* Menunggu Keberangkatan */
+    .phase-3 { background-color: #10b981; color: white; } /* Dalam Perjalanan */
+    .phase-4 { background-color: #ef4444; color: white; } /* Meninggalkan Anda */
+  </style>
+</head>
+<body>
+
+  <a href="my-tickets.html" class="back-btn">
+    <i class="bi bi-chevron-left"></i> Kembali
+  </a>
+
+  <!-- Demo Simulator Tool Panel -->
+  <div class="sim-panel">
+    <label><i class="bi bi-gear-fill"></i> Simulator Waktu (Hari Keberangkatan)</label>
+    <select id="sim-time-select">
+      <option value="early">1. Sebelum Bus Tiba di Halte (07:00 WIB)</option>
+      <option value="waiting">2. Bus Tiba & Menunggu Penumpang (07:45 WIB)</option>
+      <option value="mid">3. Bus Sedang Jalan (08:30 WIB)</option>
+      <option value="late">4. Bus Telah Berangkat / Selesai (11:30 WIB)</option>
+      <option value="realtime" selected>5. Real-time (Sesuai Jam PC)</option>
+    </select>
+    <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center;">
+      Jadwal Keberangkatan: <span id="sim-sched-time">08:00</span> WIB
+    </div>
+  </div>
+
+  <!-- Leaflet Map Container -->
+  <div id="map" style="height: 100vh; width: 100vw;"></div>
+
+  <!-- Real-time dynamic stats control panel overlay -->
+  <div class="map-control-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <span class="phase-badge phase-1" id="tracking-phase">Menuju Terminal</span>
+      <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;" id="bus-plate">B 7001 VIP</span>
+    </div>
+    
+    <div style="font-size: 1.1rem; font-weight: 700;" id="trip-title">Jakarta ➔ Bandung</div>
+    
+    <!-- Status Description -->
+    <div style="margin: 0.5rem 0; font-size: 0.9rem; line-height: 1.4;" id="status-desc">
+      Menunggu status...
+    </div>
+
+    <div class="eta-counter" id="eta-text">ETA: Calculating...</div>
+    
+    <div style="width: 100%; height: 6px; background-color: var(--border); border-radius: 3px; margin: 0.75rem 0; overflow: hidden;">
+      <div id="progress-bar" style="width: 0%; height: 100%; background-color: var(--primary); transition: width 0.5s;"></div>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+      <span id="speed-display">Kecepatan: -- km/jam</span>
+      <span id="dist-display">Sisa Jarak: -- km</span>
+    </div>
+  </div>
+
+  <!-- Leaflet Script -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const ticketId = urlParams.get("ticketId");
+      
+      if (!ticketId) {
+        alert("Tiket tidak valid!");
+        window.location.href = "my-tickets.html";
+        return;
+      }
+
+      const ticket = storage.getTicketById(ticketId);
+      if (!ticket) {
+        alert("Tiket tidak ditemukan!");
+        window.location.href = "my-tickets.html";
+        return;
+      }
+
+      // Check date visibility
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      if (todayStr !== ticket.tanggal) {
+        alert("Anda hanya bisa memantau bus pada tanggal keberangkatan tiket!");
+        window.location.href = "my-tickets.html";
+        return;
+      }
+
+      // UI Init
+      document.getElementById("bus-plate").textContent = ticket.busNomor;
+      document.getElementById("trip-title").textContent = ticket.rute;
+      document.getElementById("sim-sched-time").textContent = ticket.jamBerangkat;
+
+      // Find route details
+      const route = ROUTES.find(r => r.nama === ticket.rute);
+      if (!route) {
+        alert("Data rute tidak valid!");
+        window.location.href = "my-tickets.html";
+        return;
+      }
+
+      const pathCoords = route.coords;
+      const startTerminal = pathCoords[0];
+      const endTerminal = pathCoords[pathCoords.length - 1];
+
+      // Define Depot location (where the bus starts from before heading to startTerminal)
+      // Slightly offset from start terminal to simulate "coming to get you"
+      const depotCoord = [startTerminal[0] - 0.08, startTerminal[1] - 0.08];
+      
+      // Init Leaflet Map
+      const map = L.map('map', {
+        zoomControl: false
+      }).setView(startTerminal, 10);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Add markers for Terminals
+      L.marker(startTerminal).addTo(map).bindPopup(`<b>Terminal Keberangkatan:</b> ${ticket.ruteAwal}`);
+      L.marker(endTerminal).addTo(map).bindPopup(`<b>Terminal Tujuan:</b> ${ticket.ruteAkhir}`);
+      
+      // Draw path line
+      L.polyline(pathCoords, {
+        color: '#f97316',
+        weight: 5,
+        opacity: 0.6,
+        dashArray: '5, 10'
+      }).addTo(map);
+
+      // Draw depot-to-start line (dashed blue)
+      L.polyline([depotCoord, startTerminal], {
+        color: '#3b82f6',
+        weight: 4,
+        opacity: 0.5,
+        dashArray: '2, 6'
+      }).addTo(map);
+
+      // Custom Bus Icon
+      const busIcon = L.divIcon({
+        className: 'custom-bus-icon',
+        html: `
+          <div style="
+            background: #0ea5e9;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            font-size: 18px;
+          ">
+            <i class="bi bi-bus-front-fill"></i>
+          </div>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+
+      const busMarker = L.marker(depotCoord, { icon: busIcon }).addTo(map);
+
+      // Interpolation Helpers
+      function interpolate(p1, p2, fraction) {
+        return [
+          p1[0] + (p2[0] - p1[0]) * fraction,
+          p1[1] + (p2[1] - p1[1]) * fraction
+        ];
+      }
+
+      function getPathAtRatio(coordsList, ratio) {
+        if (ratio <= 0) return coordsList[0];
+        if (ratio >= 1) return coordsList[coordsList.length - 1];
+        
+        const totalSegments = coordsList.length - 1;
+        const segmentFloat = ratio * totalSegments;
+        const segmentIdx = Math.floor(segmentFloat);
+        const segmentFraction = segmentFloat - segmentIdx;
+        
+        return interpolate(coordsList[segmentIdx], coordsList[segmentIdx + 1], segmentFraction);
+      }
+
+      // Convert departure time to minutes from midnight
+      const [depHours, depMins] = ticket.jamBerangkat.split(":").map(Number);
+      const departureTimeMinutes = depHours * 60 + depMins;
+
+      // Update Loop
+      function updateSimulation() {
+        const simSelect = document.getElementById("sim-time-select").value;
+        let currentMinutes;
+
+        if (simSelect === "realtime") {
+          const sysNow = new Date();
+          currentMinutes = sysNow.getHours() * 60 + sysNow.getMinutes();
+        } else if (simSelect === "early") {
+          currentMinutes = departureTimeMinutes - 60; // 1 hour before departure
+        } else if (simSelect === "waiting") {
+          currentMinutes = departureTimeMinutes - 15; // 15 mins before departure (bus waiting)
+        } else if (simSelect === "mid") {
+          currentMinutes = departureTimeMinutes + (route.estimasi / 2); // halfway through trip
+        } else if (simSelect === "late") {
+          currentMinutes = departureTimeMinutes + route.estimasi + 30; // 30 mins after arrival
+        }
+
+        // Phase Timing Definitions
+        // 1. Depot to terminal: from departureTimeMinutes - 45 mins to departureTimeMinutes - 20 mins
+        // 2. Waiting at terminal: departureTimeMinutes - 20 mins to departureTimeMinutes
+        // 3. En route: departureTimeMinutes to departureTimeMinutes + route.estimasi
+        // 4. Arrived / Left: past departureTimeMinutes + route.estimasi
+
+        const phase1Start = departureTimeMinutes - 45;
+        const phase2Start = departureTimeMinutes - 20;
+        const phase3Start = departureTimeMinutes;
+        const phase4Start = departureTimeMinutes + route.estimasi;
+
+        const badge = document.getElementById("tracking-phase");
+        const statusDesc = document.getElementById("status-desc");
+        const progressDiv = document.getElementById("progress-bar");
+        const speedText = document.getElementById("speed-display");
+        const distText = document.getElementById("dist-display");
+        const etaText = document.getElementById("eta-text");
+
+        if (currentMinutes < phase1Start) {
+          // Way before trip prep
+          badge.className = "phase-badge phase-1";
+          badge.textContent = "Di Garasi";
+          statusDesc.innerHTML = `Bus masih parkir di garasi utama. Perkiraan berangkat menuju Terminal <b>${ticket.ruteAwal}</b> dalam beberapa jam.`;
+          
+          busMarker.setLatLng(depotCoord);
+          map.setView(depotCoord, 12);
+          progressDiv.style.width = "0%";
+          speedText.textContent = "Kecepatan: 0 km/jam";
+          distText.textContent = "Menunggu keberangkatan";
+          etaText.textContent = "ETA: -";
+
+        } else if (currentMinutes >= phase1Start && currentMinutes < phase2Start) {
+          // Phase 1: Bus moving from depot to Terminal
+          badge.className = "phase-badge phase-1";
+          badge.textContent = "Menuju Terminal";
+          
+          const ratio = (currentMinutes - phase1Start) / (phase2Start - phase1Start);
+          const currentPos = interpolate(depotCoord, startTerminal, ratio);
+          
+          busMarker.setLatLng(currentPos);
+          map.setView(currentPos, 12);
+          
+          statusDesc.innerHTML = `Bus sedang dalam perjalanan menuju Terminal <b>${ticket.ruteAwal}</b> untuk menjemput Anda. Jangan sampai terlambat!`;
+          progressDiv.style.width = `${Math.round(ratio * 100)}%`;
+          speedText.textContent = "Kecepatan: 45 km/jam";
+          
+          const remMins = phase2Start - currentMinutes;
+          distText.textContent = `Tiba di terminal dalam ~${remMins} menit`;
+          etaText.textContent = `Akan Tiba di Halte: ${ticket.jamBerangkat} WIB`;
+
+        } else if (currentMinutes >= phase2Start && currentMinutes < phase3Start) {
+          // Phase 2: Bus arrived at terminal, waiting for departure
+          badge.className = "phase-badge phase-2";
+          badge.textContent = "Menunggu Keberangkatan";
+          
+          busMarker.setLatLng(startTerminal);
+          map.setView(startTerminal, 14);
+          
+          statusDesc.innerHTML = `🟢 <b>Bus sudah tiba di Terminal ${ticket.ruteAwal}!</b><br>Silakan naik ke bus dengan nomor plat <b>${ticket.busNomor}</b>.`;
+          progressDiv.style.width = "100%";
+          speedText.textContent = "Kecepatan: 0 km/jam";
+          
+          const remMins = phase3Start - currentMinutes;
+          distText.textContent = `Berangkat dalam ${remMins} menit`;
+          etaText.textContent = `Jadwal Berangkat: ${ticket.jamBerangkat} WIB`;
+
+        } else if (currentMinutes >= phase3Start && currentMinutes < phase4Start) {
+          // Phase 3: En route
+          badge.className = "phase-badge phase-3";
+          badge.textContent = "Dalam Perjalanan";
+          
+          const ratio = (currentMinutes - phase3Start) / (phase4Start - phase3Start);
+          const currentPos = getPathAtRatio(pathCoords, ratio);
+          
+          busMarker.setLatLng(currentPos);
+          map.setView(currentPos, 11);
+          
+          statusDesc.innerHTML = `Bus sedang melaju ke Terminal <b>${ticket.ruteAkhir}</b>. Perjalanan lancar.`;
+          progressDiv.style.width = `${Math.round(ratio * 100)}%`;
+          
+          // Random speed variance for realism
+          const speed = Math.round(75 + Math.sin(currentMinutes) * 10);
+          speedText.textContent = `Kecepatan: ${speed} km/jam`;
+          
+          const remMins = phase4Start - currentMinutes;
+          const totalDistance = route.estimasi * 0.9;
+          const remDist = Math.max(0, (1 - ratio) * totalDistance).toFixed(1);
+          
+          distText.textContent = `Sisa Jarak: ${remDist} km`;
+          etaText.textContent = `ETA: ${Math.floor(remMins / 60)}j ${remMins % 60}m`;
+
+        } else {
+          // Phase 4: Left / Arrived
+          badge.className = "phase-badge phase-4";
+          badge.textContent = "Perjalanan Selesai";
+          
+          busMarker.setLatLng(endTerminal);
+          map.setView(endTerminal, 12);
+          
+          statusDesc.innerHTML = `Bus telah tiba di Terminal <b>${ticket.ruteAkhir}</b> pada ${ticket.jamSampai} WIB. Perjalanan Anda selesai atau bus sudah meninggalkan Anda jika terlambat.`;
+          progressDiv.style.width = "100%";
+          speedText.textContent = "Kecepatan: 0 km/jam";
+          distText.textContent = "Sudah Sampai";
+          etaText.textContent = "Tiba";
+        }
+      }
+
+      // Hook simulation change
+      document.getElementById("sim-time-select").addEventListener("change", updateSimulation);
+      
+      // Auto Update every 5 seconds for real time
+      setInterval(updateSimulation, 5000);
+      updateSimulation(); // First call
+    });
+  </script>
+</body>
+</html>

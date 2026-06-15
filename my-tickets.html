@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tiket Saya — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+  </header>
+
+  <main class="container">
+    <h2>Tiket Saya</h2>
+    <div id="tickets-list">
+      <!-- Tickets will be dynamically loaded -->
+    </div>
+  </main>
+
+  <!-- Bottom Nav Bar -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <i class="bi bi-search"></i>
+      <span>Cari</span>
+    </a>
+    <a href="my-tickets.html" class="nav-item active">
+      <i class="bi bi-ticket-perforated"></i>
+      <span>Tiket Saya</span>
+    </a>
+  </nav>
+
+  <script src="assets/js/storage.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Check Auth
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      // Filter tickets for this logged-in account
+      const tickets = storage.getUserTickets();
+      const listDiv = document.getElementById("tickets-list");
+      
+      if (tickets.length === 0) {
+        listDiv.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); padding: 3rem 1rem;">
+            <i class="bi bi-ticket-detailed" style="font-size: 3rem; display: block; margin-bottom: 1rem;"></i>
+            <p>Belum ada tiket dipesan di akun ini.</p>
+            <a href="index.html" class="btn btn-primary" style="margin-top: 1rem; width: auto; display: inline-flex;">
+              Pesan Tiket Sekarang
+            </a>
+          </div>
+        `;
+        return;
+      }
+
+      // Sort by creation desc
+      tickets.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      
+      tickets.forEach(ticket => {
+        const card = document.createElement("div");
+        card.className = "card ticket-card";
+        
+        // Visibility logic based on ticket date vs current date
+        const tDate = ticket.tanggal;
+        let actionBtnHtml = "";
+        let statusBadge = "";
+        let borderLeftColor = "var(--primary)";
+        let dateStyle = "";
+        
+        if (todayStr < tDate) {
+          // Future date
+          actionBtnHtml = `
+            <div style="background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; text-align: center; color: var(--secondary);">
+              <i class="bi bi-clock"></i> Bus beroperasi pada ${tDate}
+            </div>
+          `;
+          statusBadge = `<span class="badge badge-secondary" style="background-color: var(--secondary); color: white;">Mendatang</span>`;
+          borderLeftColor = "var(--secondary)";
+          dateStyle = "color: var(--secondary); font-weight: bold;";
+        } else if (todayStr === tDate) {
+          // Active day of travel!
+          actionBtnHtml = `
+            <a href="tracking.html?ticketId=${ticket.id}" class="btn btn-primary" style="background-color: var(--success); color: white;">
+              <i class="bi bi-geo-alt-fill"></i> Lacak Posisi & Waktu Tiba (LIVE)
+            </a>
+          `;
+          statusBadge = `<span class="badge badge-success" style="background-color: var(--success); color: white; animation: pulse-animation 2s infinite;">Hari Ini</span>`;
+          borderLeftColor = "var(--success)";
+          dateStyle = "color: var(--success); font-weight: bold;";
+        } else {
+          // Past date
+          actionBtnHtml = `
+            <div style="background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; text-align: center; color: var(--text-muted);">
+              <i class="bi bi-check-circle"></i> Perjalanan Selesai (${tDate})
+            </div>
+          `;
+          statusBadge = `<span class="badge badge-secondary">Selesai</span>`;
+          borderLeftColor = "var(--border)";
+          dateStyle = "color: var(--text-muted); text-decoration: line-through;";
+        }
+
+        card.innerHTML = `
+          <div class="ticket-header">
+            <div>
+              <strong style="color: var(--primary);">${ticket.id}</strong>
+              <span style="font-size: 0.8rem; display: block; color: var(--text-muted);">${new Date(ticket.createdAt).toLocaleDateString("id-ID")}</span>
+            </div>
+            <div>
+              ${statusBadge}
+            </div>
+          </div>
+          <div class="ticket-row">
+            <span class="ticket-label">Penumpang:</span>
+            <span class="ticket-value">${ticket.namaPenumpang}</span>
+          </div>
+          <div class="ticket-row">
+            <span class="ticket-label">Rute:</span>
+            <span class="ticket-value">${ticket.rute}</span>
+          </div>
+          <div class="ticket-row">
+            <span class="ticket-label">Keberangkatan:</span>
+            <span class="ticket-value" style="${dateStyle}">${ticket.tanggal} - ${ticket.jamBerangkat} WIB</span>
+          </div>
+          <div class="ticket-row" style="margin-bottom: 0.5rem;">
+            <span class="ticket-label">Bus:</span>
+            <span class="ticket-value">${ticket.busNomor}</span>
+          </div>
+          <div class="ticket-row" style="margin-bottom: 1rem;">
+            <span class="ticket-label">Nomor Kursi:</span>
+            <span class="ticket-value" style="color: var(--primary); font-weight: bold; font-size: 1.1rem;">${ticket.selectedSeats ? ticket.selectedSeats.join(', ') : 'Otomatis'}</span>
+          </div>
+          <div style="text-align: center; margin: 1rem 0;">
+             <!-- Inline QR Code Canvas -->
+             <canvas id="qr-${ticket.id}" width="120" height="120" style="background: white; padding: 5px; border-radius: 8px;"></canvas>
+             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Tunjukkan QR Code ini kepada petugas</div>
+          </div>
+          <div style="border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 0.75rem;">
+            ${actionBtnHtml}
+            <div style="text-align: center; margin-top: 12px;">
+              <button class="btn btn-secondary btn-sm" onclick="printSingleTicket('${ticket.id}')" style="width: auto; padding: 6px 16px; font-size: 0.8rem; background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text);">
+                <i class="bi bi-printer"></i> Cetak Boarding Pass
+              </button>
+            </div>
+          </div>
+        `;
+        card.style.borderLeftColor = borderLeftColor;
+        listDiv.appendChild(card);
+
+        // Simple Visual QR Code Pattern Generator using HTML Canvas
+        const canvas = document.getElementById(`qr-${ticket.id}`);
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          const size = canvas.width;
+          const matrixSize = 15; // 15x15 grids
+          const cellSize = size / matrixSize;
+
+          // Hash ticket ID to seed random patterns
+          let seed = 0;
+          for (let i = 0; i < ticket.id.length; i++) {
+            seed += ticket.id.charCodeAt(i);
+          }
+          const pseudoRandom = () => {
+            const x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+          };
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, size, size);
+          
+          ctx.fillStyle = "#000000";
+          for (let row = 0; row < matrixSize; row++) {
+            for (let col = 0; col < matrixSize; col++) {
+              // Standard QR finder patterns on 3 corners
+              const isFinderPattern = 
+                (row < 4 && col < 4) || // Top-Left
+                (row < 4 && col >= matrixSize - 4) || // Top-Right
+                (row >= matrixSize - 4 && col < 4); // Bottom-Left
+
+              if (isFinderPattern) {
+                // Outer ring
+                const isBorder = row === 0 || row === 3 || col === 0 || col === 3 ||
+                                 row === 0 || row === 3 || col === matrixSize - 1 || col === matrixSize - 4 ||
+                                 row === matrixSize - 1 || row === matrixSize - 4 || col === 0 || col === 3;
+                // Inner solid square
+                const isInner = (row === 1 && col === 1) || (row === 1 && col === 2) || (row === 2 && col === 1) || (row === 2 && col === 2) ||
+                                (row === 1 && col === matrixSize - 2) || (row === 1 && col === matrixSize - 3) || (row === 2 && col === matrixSize - 2) || (row === 2 && col === matrixSize - 3) ||
+                                (row === matrixSize - 2 && col === 1) || (row === matrixSize - 2 && col === 2) || (row === matrixSize - 3 && col === 1) || (row === matrixSize - 3 && col === 2);
+                
+                if (isBorder || isInner) {
+                  ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
+              } else {
+                // Random noise for payload pattern
+                if (pseudoRandom() > 0.5) {
+                  ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
+              }
+            }
+          }
+        }
+      });
+
+    // Print logic
+    window.printSingleTicket = function(ticketId) {
+      const cards = document.querySelectorAll('.ticket-card');
+      cards.forEach(c => c.classList.remove('print-only'));
+      const targetCard = Array.from(cards).find(c => {
+        const strong = c.querySelector('strong');
+        return strong && strong.textContent === ticketId;
+      });
+      if (targetCard) {
+        targetCard.classList.add('print-only');
+        window.print();
+        setTimeout(() => targetCard.classList.remove('print-only'), 1000);
+      }
+    };
+    });
+  </script>
+</body>
+</html>

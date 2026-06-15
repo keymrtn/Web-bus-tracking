@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pembayaran Mandiri Bill Payment — BusGo</title>
+  <link class="bi bi-bus-front-fill" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .payment-container {
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .timer-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .timer-text {
+      color: #ef4444;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .bank-header {
+      background: #ffc210;
+      color: #1c2b59;
+      padding: 15px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .bank-logo-text {
+      font-weight: 900;
+      font-size: 1.5rem;
+      font-style: italic;
+    }
+    .bank-body {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: none;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+      margin-bottom: 1.5rem;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+    
+    .instruction-step {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .instruction-num {
+      background: var(--primary);
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    /* Verification screen */
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+    .payment-spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(249, 115, 22, 0.1);
+      border-left-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 30px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+  </header>
+
+  <main class="payment-container">
+    
+    <!-- Screen 1: Payment Instructions & Details -->
+    <div id="screen-details" class="screen active">
+      <div style="margin-bottom: 1rem;">
+        <a href="booking.html" id="back-btn" style="color: var(--text-muted); font-size: 0.9rem;">
+          <i class="bi bi-chevron-left"></i> Batalkan & Kembali
+        </a>
+      </div>
+
+      <div class="timer-box">
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Selesaikan Pembayaran Dalam</div>
+        <div id="countdown" class="timer-text">15:00</div>
+      </div>
+
+      <!-- Ticket info card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NO. PESANAN</span>
+            <strong id="ticket-id" style="color: var(--primary);">--</strong>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">METODE</span>
+            <strong style="color: #0ea5e9;">MANDIRI</strong>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-muted);">Total Tagihan:</span>
+          <strong id="total-amount" style="font-size: 1.4rem; color: var(--success);">Rp 0</strong>
+        </div>
+      </div>
+
+      <!-- Mandiri Bill / VA Section -->
+      <div class="bank-header">
+        <span class="bank-logo-text" style="color: #1a3c73;">mandiri</span>
+        <span style="color: #1a3c73;">Bill / Transfer</span>
+      </div>
+      <div class="bank-body">
+        <div class="info-row">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">KODE PERUSAHAAN (BILLER ID)</span>
+            <strong id="company-code" style="font-size: 1.25rem; color: var(--text-main);">88912</strong>
+          </div>
+          <button class="copy-btn" onclick="copyText('company-code', 'Kode Perusahaan')">
+            <i class="bi bi-copy"></i> Copy
+          </button>
+        </div>
+        <div class="info-row">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NOMOR VA / KODE BAYAR</span>
+            <strong id="pay-code" style="font-size: 1.3rem; letter-spacing: 1px; color: var(--text-main);">700120812345678</strong>
+          </div>
+          <button class="copy-btn" onclick="copyText('pay-code', 'Kode Bayar')">
+            <i class="bi bi-copy"></i> Copy
+          </button>
+        </div>
+        <div class="info-row">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NAMA REKENING</span>
+            <strong>BusGo - <span id="passenger-name">--</span></strong>
+          </div>
+        </div>
+        <div class="info-row">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NOMINAL TRANSFER</span>
+            <strong id="transfer-amount" style="color: var(--success);">Rp 0</strong>
+          </div>
+          <button class="copy-btn" onclick="copyAmount()">
+            <i class="bi bi-copy"></i> Copy
+          </button>
+        </div>
+      </div>
+
+      <!-- Instructions card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h4 style="margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">Petunjuk Mandiri Bill Payment</h4>
+        
+        <div style="margin-bottom: 1rem;">
+          <strong style="font-size: 0.95rem; color: var(--primary); display: block; margin-bottom: 8px;">Via Livin' by Mandiri</strong>
+          <div class="instruction-step">
+            <div class="instruction-num">1</div>
+            <div>Buka aplikasi Livin' by Mandiri, login dan pilih menu <strong>Bayar</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">2</div>
+            <div>Cari atau ketik penyedia jasa: <strong>BusGo Payment</strong> atau masukkan kode Biller <strong style="color: var(--secondary);">88912</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">3</div>
+            <div>Masukkan <strong>Nomor VA / Kode Bayar</strong> <strong class="code-text-preview" style="color: var(--secondary);">70012...</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">4</div>
+            <div>Detail tagihan akan muncul. Pastikan nominal pembayaran sudah sesuai.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">5</div>
+            <div>Klik Lanjut Bayar dan masukkan PIN Livin' Anda.</div>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+          <strong style="font-size: 0.95rem; color: var(--primary); display: block; margin-bottom: 8px;">Via ATM Mandiri</strong>
+          <div class="instruction-step">
+            <div class="instruction-num">1</div>
+            <div>Masukkan kartu ATM dan PIN Mandiri Anda.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">2</div>
+            <div>Pilih menu <strong>Bayar/Beli</strong> ➔ <strong>Lainnya</strong> ➔ <strong>Multi Payment</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">3</div>
+            <div>Masukkan Kode Perusahaan <strong style="color: var(--secondary);">88912</strong> lalu tekan <strong>Benar</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">4</div>
+            <div>Masukkan <strong>Nomor VA / Kode Bayar</strong> Anda, lalu tekan <strong>Benar</strong>.</div>
+          </div>
+          <div class="instruction-step">
+            <div class="instruction-num">5</div>
+            <div>Masukkan nominal transfer dan konfirmasi pembayaran Anda.</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="pay-btn" class="btn btn-primary btn-lg" style="margin-bottom: 2rem;">
+        <i class="bi bi-shield-check"></i> Saya Sudah Bayar
+      </button>
+    </div>
+
+    <!-- Screen 2: Processing Verification -->
+    <div id="screen-loading" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div class="payment-spinner"></div>
+        <h3 style="color: var(--primary); margin-bottom: 0.5rem;">Memverifikasi Transfer Anda...</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Sistem sedang mencocokkan pembayaran Multi Payment Mandiri Anda.</p>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1.5rem;">Mohon jangan menutup atau memuat ulang halaman ini.</p>
+      </div>
+    </div>
+
+    <!-- Screen 3: Success Notification -->
+    <div id="screen-success" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <i class="bi bi-check-circle-fill" style="font-size: 4.5rem; color: var(--success); display: block; margin-bottom: 1.5rem; animation: pulse-animation 2s infinite;"></i>
+        <h2 style="color: var(--success); margin-bottom: 0.5rem;">Pembayaran Berhasil!</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Terima kasih, tagihan Mandiri Anda telah berhasil dilunasi.</p>
+        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 8px; font-size: 0.9rem; color: var(--success); font-weight: 600; margin-bottom: 1.5rem;">
+          E-Tiket Anda telah aktif dan siap digunakan.
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Mengalihkan Anda ke halaman Tiket Saya dalam beberapa saat...</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="assets/js/storage.js"></script>
+  <script>
+    // Global copy helpers
+    function copyText(elementId, label) {
+      const text = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert(`${label} berhasil disalin ke clipboard!`);
+      }).catch(err => {
+        console.error('Gagal menyalin: ', err);
+      });
+    }
+
+    let rawTotalAmount = 0;
+    function copyAmount() {
+      navigator.clipboard.writeText(rawTotalAmount.toString()).then(() => {
+        alert("Nominal transfer berhasil disalin ke clipboard!");
+      }).catch(err => {
+        console.error('Gagal menyalin: ', err);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Authenticate & load ticket
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      let ticket = null;
+      const sessionData = sessionStorage.getItem('busgo_pending_ticket');
+      if (sessionData) {
+        ticket = JSON.parse(sessionData);
+      } else {
+        const userTickets = storage.getUserTickets();
+        if (userTickets.length > 0) {
+          const pendingTickets = userTickets.filter(t => t.statusTiket === 'pending');
+          if (pendingTickets.length > 0) {
+            pendingTickets.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            ticket = pendingTickets[0];
+          }
+        }
+      }
+
+      if (!ticket) {
+        alert("Data tiket pending tidak ditemukan!");
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Store raw ticket total
+      rawTotalAmount = ticket.total;
+
+      // Generate customized VA/pay-code (700120 + phone/random)
+      let phonePart = ticket.hp ? ticket.hp.replace(/[^0-9]/g, '') : '';
+      if (phonePart.startsWith('0')) {
+        phonePart = phonePart.substring(1);
+      } else if (phonePart.startsWith('62')) {
+        phonePart = phonePart.substring(2);
+      }
+      
+      if (!phonePart) {
+        phonePart = Math.floor(100000000 + Math.random() * 900000000).toString();
+      }
+      const finalPayCode = "700120" + phonePart;
+
+      // Fill in UI
+      document.getElementById("ticket-id").textContent = ticket.id;
+      document.getElementById("total-amount").textContent = `Rp ${ticket.total.toLocaleString("id-ID")}`;
+      document.getElementById("transfer-amount").textContent = `Rp ${ticket.total.toLocaleString("id-ID")}`;
+      document.getElementById("pay-code").textContent = finalPayCode;
+      document.getElementById("passenger-name").textContent = ticket.namaPenumpang;
+      document.getElementById("back-btn").href = `booking.html?scheduleId=${ticket.scheduleId}`;
+
+      // Update instructions preview text
+      const previews = document.querySelectorAll(".code-text-preview");
+      previews.forEach(p => p.textContent = finalPayCode);
+
+      // 2. Start Countdown Timer (15:00 minutes)
+      let secondsRemaining = 15 * 60;
+      const countdownEl = document.getElementById("countdown");
+      
+      const timerInterval = setInterval(() => {
+        secondsRemaining--;
+        const mins = Math.floor(secondsRemaining / 60);
+        const secs = secondsRemaining % 60;
+        
+        countdownEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (secondsRemaining <= 0) {
+          clearInterval(timerInterval);
+          alert("Waktu pembayaran telah habis!");
+          window.location.href = "index.html";
+        }
+      }, 1000);
+
+      // 3. Handle "Saya Sudah Bayar" Button Action
+      document.getElementById("pay-btn").addEventListener("click", () => {
+        // Stop timer
+        clearInterval(timerInterval);
+        
+        // Show Loading Screen
+        document.getElementById("screen-details").classList.remove("active");
+        document.getElementById("screen-loading").classList.add("active");
+        
+        // Simulate checking payment (2 seconds)
+        setTimeout(() => {
+          // Confirm payment in storage
+          storage.confirmTicket(ticket.id);
+          
+          // Clear pending session ticket
+          sessionStorage.removeItem('busgo_pending_ticket');
+          
+          // Show Success Screen
+          document.getElementById("screen-loading").classList.remove("active");
+          document.getElementById("screen-success").classList.add("active");
+          
+          // Redirect to my-tickets.html after 2 seconds
+          setTimeout(() => {
+            window.location.href = "my-tickets.html";
+          }, 2000);
+        }, 2000);
+      });
+    });
+  </script>
+
+</body>
+</html>

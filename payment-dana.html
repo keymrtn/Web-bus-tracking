@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pembayaran DANA — BusGo</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .payment-container {
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .timer-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .timer-text {
+      color: #ef4444;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .dana-header {
+      background: #118ee9;
+      color: #fff;
+      padding: 15px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .dana-logo-text {
+      font-weight: 900;
+      font-size: 1.6rem;
+      letter-spacing: -1px;
+    }
+    .dana-body {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: none;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+    .payment-spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(249, 115, 22, 0.1);
+      border-left-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 30px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Pin layout */
+    .pin-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .pin-input {
+      width: 40px;
+      height: 45px;
+      font-size: 1.5rem;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: var(--bg-color);
+      color: #fff;
+      border-radius: 8px;
+    }
+    .pin-input:focus {
+      border-color: var(--secondary);
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <i class="bi bi-bus-front-fill"></i> BusGo
+    </div>
+  </header>
+
+  <main class="payment-container">
+    
+    <!-- Screen 1: Phone input and checkout detail -->
+    <div id="screen-details" class="screen active">
+      <div style="margin-bottom: 1rem;">
+        <a href="booking.html" id="back-btn" style="color: var(--text-muted); font-size: 0.9rem;">
+          <i class="bi bi-chevron-left"></i> Batalkan & Kembali
+        </a>
+      </div>
+
+      <div class="timer-box">
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Selesaikan Pembayaran Dalam</div>
+        <div id="countdown" class="timer-text">15:00</div>
+      </div>
+
+      <!-- Ticket info card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+          <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">NO. PESANAN</span>
+            <strong id="ticket-id" style="color: var(--primary);">--</strong>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.8rem; color: var(--text-muted); display: block;">METODE</span>
+            <strong style="color: #118ee9;">DANA</strong>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-muted);">Total Tagihan:</span>
+          <strong id="total-amount" style="font-size: 1.4rem; color: var(--success);">Rp 0</strong>
+        </div>
+      </div>
+
+      <!-- DANA Phone Form -->
+      <div class="dana-header">
+        <span class="dana-logo-text">DANA</span>
+        <span>Dompet Digital</span>
+      </div>
+      <div class="dana-body">
+        <form id="dana-phone-form">
+          <div class="form-group">
+            <label class="form-label" for="dana-phone">Nomor HP Terdaftar DANA</label>
+            <input class="form-control" type="tel" id="dana-phone" placeholder="Contoh: 08123456789" required style="font-size: 1.1rem; text-align: center; letter-spacing: 0.5px;">
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem; text-align: center;">
+            Kami akan mengirimkan permintaan pembayaran ke akun DANA Anda setelah Anda melanjutkan.
+          </p>
+          <button type="submit" class="btn btn-primary btn-lg" style="background-color: #118ee9;">
+            Lanjutkan Pembayaran
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Screen 2: OTP / PIN Verification Simulation -->
+    <div id="screen-pin" class="screen">
+      <div class="card" style="text-align: center; padding: 2rem 1.5rem;">
+        <span class="dana-logo-text" style="color: #118ee9; display: block; margin-bottom: 1rem;">DANA PIN</span>
+        <h3>Masukkan PIN DANA Anda</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem;">Demi keamanan transaksi Anda, masukkan PIN DANA untuk nomor <strong id="dana-phone-display" style="color: var(--text-main);">--</strong></p>
+        
+        <form id="dana-pin-form">
+          <div class="pin-container">
+            <input type="password" maxlength="1" class="pin-input" required autofocus>
+            <input type="password" maxlength="1" class="pin-input" required>
+            <input type="password" maxlength="1" class="pin-input" required>
+            <input type="password" maxlength="1" class="pin-input" required>
+            <input type="password" maxlength="1" class="pin-input" required>
+            <input type="password" maxlength="1" class="pin-input" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg" style="background-color: #118ee9;">
+            Konfirmasi Pembayaran
+          </button>
+        </form>
+        <button onclick="backToPhone()" class="btn btn-secondary" style="margin-top: 1rem; background: transparent; border: none; font-size: 0.9rem; color: var(--text-muted);">
+          Ganti Nomor HP
+        </button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Processing Verification -->
+    <div id="screen-loading" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <div class="payment-spinner"></div>
+        <h3 style="color: var(--primary); margin-bottom: 0.5rem;">Memproses Pembayaran DANA...</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Sistem sedang mendebit saldo DANA Anda secara aman.</p>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1.5rem;">Mohon jangan menutup atau memuat ulang halaman ini.</p>
+      </div>
+    </div>
+
+    <!-- Screen 4: Success Notification -->
+    <div id="screen-success" class="screen">
+      <div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+        <i class="bi bi-check-circle-fill" style="font-size: 4.5rem; color: var(--success); display: block; margin-bottom: 1.5rem; animation: pulse-animation 2s infinite;"></i>
+        <h2 style="color: var(--success); margin-bottom: 0.5rem;">Pembayaran Berhasil!</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Terima kasih, saldo DANA Anda telah berhasil dipotong.</p>
+        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 8px; font-size: 0.9rem; color: var(--success); font-weight: 600; margin-bottom: 1.5rem;">
+          E-Tiket Anda telah aktif dan siap digunakan.
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Mengalihkan Anda ke halaman Tiket Saya dalam beberapa saat...</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="assets/js/storage.js"></script>
+  <script>
+    let timerInterval = null;
+    let secondsRemaining = 15 * 60;
+
+    function backToPhone() {
+      document.getElementById("screen-pin").classList.remove("active");
+      document.getElementById("screen-details").classList.add("active");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Authenticate & load ticket
+      const currentUser = storage.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      let ticket = null;
+      const sessionData = sessionStorage.getItem('busgo_pending_ticket');
+      if (sessionData) {
+        ticket = JSON.parse(sessionData);
+      } else {
+        const userTickets = storage.getUserTickets();
+        if (userTickets.length > 0) {
+          const pendingTickets = userTickets.filter(t => t.statusTiket === 'pending');
+          if (pendingTickets.length > 0) {
+            pendingTickets.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            ticket = pendingTickets[0];
+          }
+        }
+      }
+
+      if (!ticket) {
+        alert("Data tiket pending tidak ditemukan!");
+        window.location.href = "index.html";
+        return;
+      }
+
+      // Fill in UI
+      document.getElementById("ticket-id").textContent = ticket.id;
+      document.getElementById("total-amount").textContent = `Rp ${ticket.total.toLocaleString("id-ID")}`;
+      document.getElementById("dana-phone").value = ticket.hp || "";
+      document.getElementById("back-btn").href = `booking.html?scheduleId=${ticket.scheduleId}`;
+
+      // 2. Start Countdown Timer (15:00 minutes)
+      const countdownEl = document.getElementById("countdown");
+      
+      timerInterval = setInterval(() => {
+        secondsRemaining--;
+        const mins = Math.floor(secondsRemaining / 60);
+        const secs = secondsRemaining % 60;
+        
+        countdownEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (secondsRemaining <= 0) {
+          clearInterval(timerInterval);
+          alert("Waktu pembayaran telah habis!");
+          window.location.href = "index.html";
+        }
+      }, 1000);
+
+      // 3. Handle Phone Form Submit -> Move to PIN Screen
+      document.getElementById("dana-phone-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const phone = document.getElementById("dana-phone").value;
+        document.getElementById("dana-phone-display").textContent = phone;
+        
+        document.getElementById("screen-details").classList.remove("active");
+        document.getElementById("screen-pin").classList.add("active");
+        
+        // Auto-focus first pin input
+        const pins = document.querySelectorAll(".pin-input");
+        if(pins.length > 0) pins[0].focus();
+      });
+
+      // 4. Pin Auto-Tab helper
+      const pins = document.querySelectorAll(".pin-input");
+      pins.forEach((p, idx) => {
+        p.addEventListener("input", (e) => {
+          if (p.value.length === 1 && idx < pins.length - 1) {
+            pins[idx + 1].focus();
+          }
+        });
+        p.addEventListener("keydown", (e) => {
+          if (e.key === "Backspace" && p.value.length === 0 && idx > 0) {
+            pins[idx - 1].focus();
+          }
+        });
+      });
+
+      // 5. Submit DANA PIN Form -> Show loading -> Success
+      document.getElementById("dana-pin-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        
+        // Stop timer
+        clearInterval(timerInterval);
+        
+        // Move to loading screen
+        document.getElementById("screen-pin").classList.remove("active");
+        document.getElementById("screen-loading").classList.add("active");
+
+        // Simulate checking payment (2 seconds)
+        setTimeout(() => {
+          // Confirm payment in storage
+          storage.confirmTicket(ticket.id);
+          
+          // Clear pending session ticket
+          sessionStorage.removeItem('busgo_pending_ticket');
+          
+          // Show Success Screen
+          document.getElementById("screen-loading").classList.remove("active");
+          document.getElementById("screen-success").classList.add("active");
+          
+          // Redirect to my-tickets.html after 2 seconds
+          setTimeout(() => {
+            window.location.href = "my-tickets.html";
+          }, 2000);
+        }, 2000);
+      });
+    });
+  </script>
+
+</body>
+</html>
