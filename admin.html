@@ -654,20 +654,56 @@
         });
       }
 
-      function updateAutoRouteName() {
-        const awal = document.getElementById("route-awal").value;
-        const akhir = document.getElementById("route-akhir").value;
-        const namaInput = document.getElementById("route-nama");
+      // Update nama rute otomatis + estimasi waktu otomatis saat terminal dipilih
+            function updateAutoRouteName() {
+              const awal = document.getElementById("route-awal").value;
+              const akhir = document.getElementById("route-akhir").value;
+              const namaInput = document.getElementById("route-nama");
+              const estimasiInput = document.getElementById("route-estimasi");
         
-        let namaAwal = awal.replace(/Terminal /i, "").trim();
-        let namaAkhir = akhir.replace(/Terminal /i, "").trim();
+              let namaAwal = awal.replace(/Terminal /i, "").trim();
+              let namaAkhir = akhir.replace(/Terminal /i, "").trim();
         
-        if (namaAwal && namaAkhir) {
-          namaInput.value = `${namaAwal} - ${namaAkhir}`;
-        } else {
-          namaInput.value = "";
-        }
-      }
+              if (namaAwal && namaAkhir) {
+                namaInput.value = `${namaAwal} - ${namaAkhir}`;
+              } else {
+                namaInput.value = "";
+              }
+
+              // Auto-estimate waktu jika kedua terminal sudah dipilih
+              const awalCoordsRaw = document.getElementById("route-awal-coords").value;
+              const akhirCoordsRaw = document.getElementById("route-akhir-coords").value;
+
+              if (awalCoordsRaw && akhirCoordsRaw) {
+                try {
+                  const [lat1, lon1] = JSON.parse(awalCoordsRaw);
+                  const [lat2, lon2] = JSON.parse(akhirCoordsRaw);
+                  const distanceKm = haversineDistance(lat1, lon1, lat2, lon2);
+                  // Kecepatan rata-rata bus antarkota Indonesia: 55 km/jam (termasuk traffic & istirahat)
+                  const estimasiMenit = Math.round((distanceKm / 55) * 60);
+                  // Minimum 30 menit, tambahkan buffer 20% untuk kondisi jalan Indonesia
+                  const bufferedMenit = Math.max(30, Math.round(estimasiMenit * 1.2));
+                  estimasiInput.value = bufferedMenit;
+                } catch(e) {
+                  // fallback: kosongkan jika gagal parsing
+                }
+              }
+            }
+
+            // Haversine formula: hitung jarak lurus (km) antara 2 koordinat GPS
+            function haversineDistance(lat1, lon1, lat2, lon2) {
+              const R = 6371; // Radius Bumi dalam km
+              const dLat = toRad(lat2 - lat1);
+              const dLon = toRad(lon2 - lon1);
+              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              return R * c;
+            }
+            function toRad(deg) {
+              return deg * (Math.PI / 180);
+            }
 
       setupAutocomplete("route-awal", "route-awal-suggestions", "route-awal-coords", "route-akhir");
       setupAutocomplete("route-akhir", "route-akhir-suggestions", "route-akhir-coords", "route-awal");
