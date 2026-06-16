@@ -52,6 +52,43 @@
       max-width: 500px;
       width: 90%;
     }
+    .autocomplete-container {
+      position: relative;
+    }
+    .autocomplete-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .suggestion-item {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      color: var(--text);
+    }
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+    .suggestion-item:hover {
+      background: var(--primary);
+      color: white;
+    }
+    .suggestion-item small {
+      color: var(--text-muted);
+    }
+    .suggestion-item:hover small {
+      color: rgba(255, 255, 255, 0.8);
+    }
   </style>
 </head>
 <body>
@@ -188,28 +225,35 @@
       <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem;">
         <div class="card">
           <h3 id="route-form-title"><i class="bi bi-map-fill"></i> Tambah Rute Baru</h3>
-          <form id="route-form">
+          <form id="route-form" autocomplete="off">
             <input type="hidden" id="edit-route-id">
-            <div class="form-group">
-              <label class="form-label" for="route-nama">Nama Rute</label>
-              <input class="form-control" type="text" id="route-nama" placeholder="Contoh: Jakarta - Bandung" required>
-            </div>
-            <div class="form-group">
+            
+            <div class="form-group autocomplete-container">
               <label class="form-label" for="route-awal">Terminal Keberangkatan</label>
-              <input class="form-control" type="text" id="route-awal" placeholder="Contoh: Terminal Kalideres" required>
+              <input class="form-control" type="text" id="route-awal" placeholder="Cari terminal atau daerah keberangkatan..." required>
+              <div id="route-awal-suggestions" class="autocomplete-suggestions" style="display: none;"></div>
             </div>
-            <div class="form-group">
+
+            <div class="form-group autocomplete-container">
               <label class="form-label" for="route-akhir">Terminal Kedatangan</label>
-              <input class="form-control" type="text" id="route-akhir" placeholder="Contoh: Terminal Lebak Siliwangi" required>
+              <input class="form-control" type="text" id="route-akhir" placeholder="Cari terminal atau daerah kedatangan..." required>
+              <div id="route-akhir-suggestions" class="autocomplete-suggestions" style="display: none;"></div>
             </div>
+
+            <div class="form-group">
+              <label class="form-label" for="route-nama">Nama Rute (Otomatis)</label>
+              <input class="form-control" type="text" id="route-nama" readonly placeholder="Akan terisi otomatis..." required style="background: rgba(255,255,255,0.05);">
+            </div>
+
             <div class="form-group">
               <label class="form-label" for="route-estimasi">Estimasi Waktu (Menit)</label>
               <input class="form-control" type="number" id="route-estimasi" placeholder="Contoh: 180" required>
             </div>
-            <div class="form-group">
-              <label class="form-label" for="route-coords">Koordinat Rute (Format JSON Array Coords)</label>
-              <textarea class="form-control" id="route-coords" placeholder="[[-6.1601, 106.7029], [-6.8904, 107.6106]]" required style="font-family: monospace; height: 100px;"></textarea>
-            </div>
+
+            <!-- Hidden inputs untuk menyimpan data koordinat terplih -->
+            <input type="hidden" id="route-awal-coords">
+            <input type="hidden" id="route-akhir-coords">
+
             <button type="submit" id="route-submit-btn" class="btn btn-primary">Simpan Rute</button>
             <button type="button" id="route-cancel-btn" class="btn btn-secondary" style="margin-top: 10px; display: none;" onclick="resetRouteForm()">Batal</button>
           </form>
@@ -255,6 +299,7 @@
   </main>
 
   <script src="assets/js/storage.js"></script>
+  <script src="assets/js/terminals.js"></script>
   <script src="assets/js/data.js"></script>
   <script>
     function logoutAdmin() {
@@ -562,6 +607,72 @@
         });
       };
 
+
+      // --- AUTOCOMPLETE LOGIC ---
+      function setupAutocomplete(inputId, suggestionsId, coordsInputId, oppositeInputId) {
+        const input = document.getElementById(inputId);
+        const suggestionsBox = document.getElementById(suggestionsId);
+        const coordsInput = document.getElementById(coordsInputId);
+
+        input.addEventListener("input", function() {
+          const val = this.value.toLowerCase();
+          suggestionsBox.innerHTML = "";
+          if (!val) {
+            suggestionsBox.style.display = "none";
+            coordsInput.value = "";
+            return;
+          }
+          
+          const matches = (typeof INDONESIA_TERMINALS !== 'undefined' ? INDONESIA_TERMINALS : []).filter(t => 
+            t.nama.toLowerCase().includes(val) || t.daerah.toLowerCase().includes(val)
+          );
+
+          if (matches.length > 0) {
+            matches.forEach(m => {
+              const div = document.createElement("div");
+              div.className = "suggestion-item";
+              div.innerHTML = `<span>${m.nama}</span> <small>${m.daerah}</small>`;
+              div.onclick = function() {
+                input.value = m.nama;
+                coordsInput.value = JSON.stringify(m.coords);
+                suggestionsBox.style.display = "none";
+                updateAutoRouteName();
+              };
+              suggestionsBox.appendChild(div);
+            });
+            suggestionsBox.style.display = "block";
+          } else {
+            suggestionsBox.style.display = "none";
+          }
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener("click", function(e) {
+          if (e.target !== input && e.target !== suggestionsBox) {
+            suggestionsBox.style.display = "none";
+          }
+        });
+      }
+
+      function updateAutoRouteName() {
+        const awal = document.getElementById("route-awal").value;
+        const akhir = document.getElementById("route-akhir").value;
+        const namaInput = document.getElementById("route-nama");
+        
+        let namaAwal = awal.replace(/Terminal /i, "").trim();
+        let namaAkhir = akhir.replace(/Terminal /i, "").trim();
+        
+        if (namaAwal && namaAkhir) {
+          namaInput.value = `${namaAwal} - ${namaAkhir}`;
+        } else {
+          namaInput.value = "";
+        }
+      }
+
+      setupAutocomplete("route-awal", "route-awal-suggestions", "route-awal-coords", "route-akhir");
+      setupAutocomplete("route-akhir", "route-akhir-suggestions", "route-akhir-coords", "route-awal");
+
+      // --- FORM SUBMIT LOGIC ---
       document.getElementById("route-form").addEventListener("submit", (e) => {
         e.preventDefault();
 
@@ -570,15 +681,20 @@
         const awal = document.getElementById("route-awal").value;
         const akhir = document.getElementById("route-akhir").value;
         const estimasi = parseInt(document.getElementById("route-estimasi").value);
-        let coords;
         
-        try {
-          coords = JSON.parse(document.getElementById("route-coords").value);
-          if (!Array.isArray(coords)) throw new Error("Must be an array of coordinates");
-        } catch (e) {
-          alert("Format koordinat salah! Harus format JSON array valid, contoh: [[-6.12, 106.32], [-6.23, 107.01]]");
+        const awalCoordsRaw = document.getElementById("route-awal-coords").value;
+        const akhirCoordsRaw = document.getElementById("route-akhir-coords").value;
+
+        if (!awalCoordsRaw || !akhirCoordsRaw) {
+          alert("Silakan pilih terminal dari saran/dropdown pencarian agar titik koordinat valid didapatkan!");
           return;
         }
+
+        const coordsAwal = JSON.parse(awalCoordsRaw);
+        const coordsAkhir = JSON.parse(akhirCoordsRaw);
+        
+        // Buat garis lurus saja untuk simulasi rute antar terminal jika custom
+        const coords = [coordsAwal, coordsAkhir];
 
         let customRoutes = storage.getCustomRoutes();
         if (!customRoutes) {
@@ -613,7 +729,11 @@
         document.getElementById("route-awal").value = r.awal;
         document.getElementById("route-akhir").value = r.akhir;
         document.getElementById("route-estimasi").value = r.estimasi;
-        document.getElementById("route-coords").value = JSON.stringify(r.coords);
+        
+        if (r.coords && r.coords.length >= 2) {
+          document.getElementById("route-awal-coords").value = JSON.stringify(r.coords[0]);
+          document.getElementById("route-akhir-coords").value = JSON.stringify(r.coords[r.coords.length - 1]);
+        }
 
         document.getElementById("route-form-title").innerHTML = `<i class="bi bi-pencil-square"></i> Edit Rute ${id}`;
         document.getElementById("route-submit-btn").textContent = "Simpan Perubahan Rute";
@@ -623,6 +743,8 @@
       window.resetRouteForm = () => {
         document.getElementById("route-form").reset();
         document.getElementById("edit-route-id").value = "";
+        document.getElementById("route-awal-coords").value = "";
+        document.getElementById("route-akhir-coords").value = "";
         document.getElementById("route-form-title").innerHTML = `<i class="bi bi-map-fill"></i> Tambah Rute Baru`;
         document.getElementById("route-submit-btn").textContent = "Simpan Rute";
         document.getElementById("route-cancel-btn").style.display = "none";
