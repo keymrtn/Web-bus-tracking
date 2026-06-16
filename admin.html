@@ -111,7 +111,6 @@
       <button class="tab-btn active" onclick="switchTab('tab-schedules')"><i class="bi bi-calendar3"></i> Jadwal</button>
       <button class="tab-btn" onclick="switchTab('tab-buses')"><i class="bi bi-bus-front"></i> Bus</button>
       <button class="tab-btn" onclick="switchTab('tab-routes')"><i class="bi bi-map"></i> Rute</button>
-      <button class="tab-btn" onclick="switchTab('tab-io')"><i class="bi bi-arrow-left-right"></i> Import/Export JSON</button>
     </div>
 
     <!-- TAB: SCHEDULES -->
@@ -276,23 +275,6 @@
             </table>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- TAB: IMPORT/EXPORT JSON -->
-    <section id="tab-io" class="admin-tab-content">
-      <div class="card">
-        <h3><i class="bi bi-download"></i> Export Data Aplikasi</h3>
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Klik tombol di bawah untuk menyalin atau mendownload seluruh database (Users, Tickets, Custom Schedules, Custom Routes, dan Custom Buses) dalam format JSON string.</p>
-        <button class="btn btn-primary" onclick="triggerExport()"><i class="bi bi-clipboard"></i> Salin JSON ke Clipboard</button>
-        <textarea id="export-area" readonly class="form-control" style="margin-top: 1rem; height: 150px; font-family: monospace; font-size: 0.85rem;"></textarea>
-      </div>
-
-      <div class="card" style="margin-top: 1.5rem;">
-        <h3><i class="bi bi-upload"></i> Import Data Aplikasi</h3>
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Tempel JSON string hasil export di bawah ini untuk memulihkan seluruh data aplikasi Anda.</p>
-        <textarea id="import-area" class="form-control" placeholder="Tempel data JSON di sini..." style="height: 150px; font-family: monospace; font-size: 0.85rem;"></textarea>
-        <button class="btn btn-primary" onclick="triggerImport()" style="margin-top: 1rem; background-color: var(--success);"><i class="bi bi-check-circle"></i> Proses Import</button>
       </div>
     </section>
 
@@ -803,37 +785,6 @@
       renderBusesTable();
       renderRoutesTable();
     });
-
-    // --- IMPORT / EXPORT JS FUNCTIONALITY ---
-    function triggerExport() {
-      const dataStr = storage.exportData();
-      const exportArea = document.getElementById("export-area");
-      exportArea.value = dataStr;
-      exportArea.select();
-      try {
-        document.execCommand("copy");
-        alert("Data JSON sukses disalin ke clipboard!");
-      } catch (err) {
-        alert("Gagal menyalin otomatis, silakan salin teks di textarea secara manual.");
-      }
-    }
-
-    function triggerImport() {
-      const jsonStr = document.getElementById("import-area").value;
-      if (!jsonStr.trim()) {
-        alert("Silakan masukkan data JSON terlebih dahulu!");
-        return;
-      }
-      if (confirm("Mengimport data baru akan menimpa data yang ada saat ini. Lanjutkan?")) {
-        const res = storage.importData(jsonStr);
-        if (res.success) {
-          alert("Import Data Sukses! Halaman akan dimuat ulang.");
-          window.location.reload();
-        } else {
-          alert("Gagal Import: " + res.message);
-        }
-      }
-    }
   </script>
 </body>
 </html>
