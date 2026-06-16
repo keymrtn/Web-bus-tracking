@@ -47,13 +47,23 @@
 
       document.getElementById("login-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        const res = storage.login(
-          document.getElementById("username").value,
-          document.getElementById("password").value
-        );
+        
+        const usernameVal = document.getElementById("username").value;
+        const passwordVal = document.getElementById("password").value;
+
+        // Cek preview role secara kasar untuk memberikan petunjuk langsung
+        const res = storage.login(usernameVal, passwordVal);
         
         if (res.success) {
-          window.location.href = res.user.role === "admin" ? "admin.html" : "index.html";
+          if (res.user.role === "admin") {
+            // Logout kembali karena login.html khusus user
+            storage.logout();
+            const err = document.getElementById("error-alert");
+            err.style.display = "block";
+            err.innerHTML = 'Akun admin terdeteksi! Silakan login melalui <a href="login-admin.html" style="color: var(--primary); font-weight: bold; text-decoration: underline;">Portal Admin</a>.';
+          } else {
+            window.location.href = "index.html";
+          }
         } else {
           const err = document.getElementById("error-alert");
           err.style.display = "block";

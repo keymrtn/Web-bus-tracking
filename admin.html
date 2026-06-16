@@ -286,7 +286,7 @@
   <script>
     function logoutAdmin() {
       storage.logout();
-      window.location.href = "login.html";
+      window.location.href = "login-admin.html";
     }
 
     function switchTab(tabId) {
@@ -302,7 +302,7 @@
       const currentUser = storage.getCurrentUser();
       if (!currentUser || currentUser.role !== "admin") {
         alert("Akses ditolak! Halaman ini hanya untuk Administrator.");
-        window.location.href = "login.html";
+        window.location.href = "login-admin.html";
         return;
       }
 
