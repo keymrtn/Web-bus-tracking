@@ -13,13 +13,10 @@
     <div class="app-brand">
       <i class="bi bi-bus-front-fill"></i> BusGo
     </div>
-    <div class="header-profile" id="user-header">
-      <!-- Loaded dynamically -->
-    </div>
+    <div class="header-profile" id="user-header"></div>
   </header>
 
   <main class="container">
-    <!-- Search Form Card -->
     <section class="card">
       <h2>Cari Jadwal Bus</h2>
       <form id="search-form">
@@ -41,16 +38,12 @@
       </form>
     </section>
 
-    <!-- Schedule Results -->
     <section id="results-section" style="display: none;">
       <h3 id="results-title">Jadwal Tersedia</h3>
-      <div id="schedule-list">
-        <!-- Rendered JS -->
-      </div>
+      <div id="schedule-list"></div>
     </section>
   </main>
 
-  <!-- Bottom Nav Bar -->
   <nav class="bottom-nav">
     <a href="index.html" class="nav-item active">
       <i class="bi bi-search"></i>
@@ -62,19 +55,15 @@
     </a>
   </nav>
 
-  <!-- Scripts -->
-  <script src="assets/js/storage.js"></script>
-  <script src="assets/js/data.js"></script>
+  <script src="assets/js/api.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Check Auth
-      const currentUser = storage.getCurrentUser();
-      if (!currentUser) {
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (!api.isLoggedIn()) {
         window.location.href = "login.html";
         return;
       }
 
-      // Display user header
+      const currentUser = api.getCurrentUser();
       const headerDiv = document.getElementById("user-header");
       headerDiv.innerHTML = `
         <span style="font-size:0.9rem; margin-right: 10px;">Halo, <b>${currentUser.name}</b></span>
@@ -82,80 +71,88 @@
       `;
 
       document.getElementById("btn-logout").addEventListener("click", () => {
-        storage.logout();
+        api.logout();
         window.location.href = "login.html";
       });
 
       const routeSelect = document.getElementById("select-route");
       const dateInput = document.getElementById("select-date");
       
-      // Set default date to today (or June 18, 2026 for testing)
-      const testDate = "2026-06-18";
-      dateInput.value = testDate;
+      // Default date to today
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.value = today;
 
-      // Fill routes dynamically from ROUTES list
-      ROUTES.forEach(route => {
-        const option = document.createElement("option");
-        option.value = route.id;
-        option.textContent = `${route.nama} (${route.awal} ➔ ${route.akhir})`;
-        routeSelect.appendChild(option);
-      });
+      // Load routes from DB
+      try {
+        const routes = await api.getRoutes();
+        routes.forEach(route => {
+          const option = document.createElement("option");
+          option.value = route.id;
+          option.textContent = `${route.origin_name} ➔ ${route.dest_name} (${route.jarak || ''})`;
+          routeSelect.appendChild(option);
+        });
+      } catch (err) {
+        alert("Gagal memuat rute: " + err.message);
+      }
       
-      // Handle search submit
-      document.getElementById("search-form").addEventListener("submit", (e) => {
+      // Search schedules
+      document.getElementById("search-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const routeId = routeSelect.value;
         const selectedDate = dateInput.value;
-        
-        // Generate and filter schedules
-        const allSchedules = generateSchedulesForDate(selectedDate);
-        const filtered = allSchedules.filter(s => s.routeId === routeId);
-        
         const resultsSection = document.getElementById("results-section");
         const listDiv = document.getElementById("schedule-list");
         
         listDiv.innerHTML = "";
         resultsSection.style.display = "block";
         
-        if (filtered.length === 0) {
-          listDiv.innerHTML = `
-            <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
-              <i class="bi bi-calendar-x" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;"></i>
-              Tidak ada jadwal pada tanggal ini.
-            </div>
-          `;
-          return;
-        }
-        
-        filtered.forEach(schedule => {
-          const availableSeats = storage.getAvailableSeats(schedule.id);
-          const isSoldOut = availableSeats === 0;
+        try {
+          const schedules = await api.getSchedules({ tanggal: selectedDate, route_id: routeId });
+          
+          if (schedules.length === 0) {
+            listDiv.innerHTML = `
+              <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                <i class="bi bi-calendar-x" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;"></i>
+                Tidak ada jadwal pada rute dan tanggal ini.
+              </div>
+            `;
+            return;
+          }
+          
+          for (const schedule of schedules) {
+            // Fetch booked seats
+            const booked = await api.getBookedSeats(schedule.id);
+            const left = Math.max(0, schedule.kapasitas - booked.length);
+            const isSoldOut = left === 0;
 
-          const item = document.createElement("div");
-          item.className = "schedule-item";
-          item.innerHTML = `
-            <div class="schedule-details">
+            const item = document.createElement("div");
+            item.className = "schedule-item";
+            item.innerHTML = `
+              <div class="schedule-details">
+                <div>
+                  <strong>${schedule.bus_nomor}</strong>
+                  <span class="bus-type">${schedule.bus_tipe}</span>
+                </div>
+                <div style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);">
+                  <i class="bi bi-clock"></i> ${schedule.time_start} WIB ➔ ${schedule.time_end} WIB
+                </div>
+                <div style="margin-top: 5px; font-weight: 600; color: var(--primary);">
+                  Rp ${Number(schedule.price).toLocaleString("id-ID")}
+                  <span style="font-size: 0.8rem; margin-left: 10px; color: ${isSoldOut ? '#ef4444' : 'var(--success)'};">Sisa Kursi: ${left}</span>
+                </div>
+              </div>
               <div>
-                <strong>${schedule.busNomor}</strong>
-                <span class="bus-type">${schedule.busTipe}</span>
+                ${isSoldOut ? 
+                  `<button class="btn btn-secondary" disabled style="padding: 6px 12px; font-size: 0.85rem; cursor: not-allowed; opacity: 0.7;">Penuh</button>` : 
+                  `<a href="booking.html?scheduleId=${schedule.id}" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;">Pesan</a>`
+                }
               </div>
-              <div style="margin-top: 5px; font-size: 0.9rem; color: var(--text-muted);">
-                <i class="bi bi-clock"></i> ${schedule.jamBerangkat} WIB ➔ ${schedule.jamSampai} WIB
-              </div>
-              <div style="margin-top: 5px; font-weight: 600; color: var(--primary);">
-                Rp ${schedule.harga.toLocaleString("id-ID")}
-                <span style="font-size: 0.8rem; margin-left: 10px; color: ${isSoldOut ? '#ef4444' : 'var(--success)'};">Sisa Kursi: ${availableSeats}</span>
-              </div>
-            </div>
-            <div>
-              ${isSoldOut ? 
-                `<button class="btn btn-secondary" disabled style="padding: 6px 12px; font-size: 0.85rem; cursor: not-allowed; opacity: 0.7;">Penuh</button>` : 
-                `<a href="booking.html?scheduleId=${schedule.id}" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;">Pesan</a>`
-              }
-            </div>
-          `;
-          listDiv.appendChild(item);
-        });
+            `;
+            listDiv.appendChild(item);
+          }
+        } catch (err) {
+          alert("Gagal memuat jadwal: " + err.message);
+        }
       });
     });
   </script>

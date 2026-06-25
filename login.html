@@ -25,7 +25,7 @@
       
       <div class="form-group">
         <label class="form-label" for="password">Password</label>
-        <input class="form-control" type="password" id="password" required placeholder="adminpassword">
+        <input class="form-control" type="password" id="password" required placeholder="password">
       </div>
       
       <button type="submit" class="btn btn-primary" style="width: 100%;">Masuk</button>
@@ -36,38 +36,30 @@
     </form>
   </div>
 
-  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/api.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // Auto redirect if already logged in
-      const user = storage.getCurrentUser();
+      const user = api.getCurrentUser();
       if (user) {
         window.location.href = user.role === "admin" ? "admin.html" : "index.html";
       }
 
-      document.getElementById("login-form").addEventListener("submit", (e) => {
+      document.getElementById("login-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        
-        const usernameVal = document.getElementById("username").value;
-        const passwordVal = document.getElementById("password").value;
+        const errorAlert = document.getElementById("error-alert");
+        errorAlert.style.display = "none";
 
-        // Cek preview role secara kasar untuk memberikan petunjuk langsung
-        const res = storage.login(usernameVal, passwordVal);
-        
-        if (res.success) {
-          if (res.user.role === "admin") {
-            // Logout kembali karena login.html khusus user
-            storage.logout();
-            const err = document.getElementById("error-alert");
-            err.style.display = "block";
-            err.innerHTML = 'Akun admin terdeteksi! Silakan login melalui <a href="login-admin.html" style="color: var(--primary); font-weight: bold; text-decoration: underline;">Portal Admin</a>.';
-          } else {
-            window.location.href = "index.html";
+        const userVal = document.getElementById("username").value.trim();
+        const passVal = document.getElementById("password").value;
+
+        try {
+          const res = await api.login(userVal, passVal);
+          if (res.success) {
+            window.location.href = res.user.role === "admin" ? "admin.html" : "index.html";
           }
-        } else {
-          const err = document.getElementById("error-alert");
-          err.style.display = "block";
-          err.textContent = res.message;
+        } catch (err) {
+          errorAlert.textContent = err.message;
+          errorAlert.style.display = "block";
         }
       });
     });

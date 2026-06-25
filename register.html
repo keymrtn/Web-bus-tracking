@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daftar Akun — BusGo</title>
+  <link class="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body style="display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg);">
@@ -37,24 +38,27 @@
     </form>
   </div>
 
-  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/api.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("register-form").addEventListener("submit", (e) => {
+      document.getElementById("register-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const res = storage.registerUser(
-          document.getElementById("username").value,
-          document.getElementById("password").value,
-          document.getElementById("name").value
-        );
-        
-        if (res.success) {
-          alert("Registrasi sukses! Silakan login.");
-          window.location.href = "login.html";
-        } else {
-          const err = document.getElementById("error-alert");
-          err.style.display = "block";
-          err.textContent = res.message;
+        const errorAlert = document.getElementById("error-alert");
+        errorAlert.style.display = "none";
+
+        const name = document.getElementById("name").value.trim();
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        try {
+          const res = await api.register(username, password, name);
+          if (res.success) {
+            alert("Registrasi berhasil! Silakan login.");
+            window.location.href = "login.html";
+          }
+        } catch (err) {
+          errorAlert.textContent = err.message;
+          errorAlert.style.display = "block";
         }
       });
     });

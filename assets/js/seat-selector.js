@@ -66,13 +66,8 @@
     // Check already selected seats in current session
     if (selectedSeats && selectedSeats.includes(seatKey)) return 'selected';
     
-    // Check storage for confirmed tickets
-    const tickets = storage.getTickets().filter(
-      t => t.scheduleId === scheduleId && t.statusTiket !== 'dibatalkan'
-    );
-    for (const t of tickets) {
-      if (t.selectedSeats && t.selectedSeats.includes(seatKey)) return 'booked';
-    }
+    // Check global API state (injected by page scripts)
+    if (window.apiBookedSeats && window.apiBookedSeats.includes(seatKey)) return 'booked';
     return 'available';
   }
 

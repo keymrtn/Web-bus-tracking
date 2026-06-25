@@ -8,3 +8,7 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# API backend
+api/node_modules/
+api/*.db
