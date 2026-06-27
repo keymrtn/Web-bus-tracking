@@ -51,15 +51,13 @@
         const password = document.getElementById("password").value;
 
         try {
-          const res = await api.register(username, password, name);
-          if (res.success) {
-            alert("Registrasi berhasil! Silakan login.");
-            window.location.href = "login.html";
-          }
-        } catch (err) {
-          errorAlert.textContent = err.message;
-          errorAlert.style.display = "block";
-        }
+                  await api.register(username, password, name);
+                  alert("Registrasi berhasil! Silakan login.");
+                  window.location.href = "login.html";
+                } catch (err) {
+                  errorAlert.textContent = err.message;
+                  errorAlert.style.display = "block";
+                }
       });
     });
   </script>

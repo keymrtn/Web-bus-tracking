@@ -53,14 +53,13 @@
         const passVal = document.getElementById("password").value;
 
         try {
-          const res = await api.login(userVal, passVal);
-          if (res.success) {
-            window.location.href = res.user.role === "admin" ? "admin.html" : "index.html";
-          }
-        } catch (err) {
-          errorAlert.textContent = err.message;
-          errorAlert.style.display = "block";
-        }
+                  await api.login(userVal, passVal);
+                  const userData = api.getCurrentUser();
+                  window.location.href = userData && userData.role === 'admin' ? 'admin.html' : 'index.html';
+                } catch (err) {
+                  errorAlert.textContent = err.message;
+                  errorAlert.style.display = 'block';
+                }
       });
     });
   </script>

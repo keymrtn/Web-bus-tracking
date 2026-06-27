@@ -1,31 +1,44 @@
 // BusGo API Client — connects frontend to backend
+// Updated: Handle standardized {success, data, error} response format
+// Sesuai rules: API Response Format
 const BASE_URL = 'http://localhost:3000';
 
+// Wrapper untuk fetch dengan standardized response handling
+async function apiRequest(method, path, body) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+
+  // Attach auth token if available
+  const token = localStorage.getItem('busgo_token');
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(`${BASE_URL}${path}`, opts);
+  const response = await res.json();
+
+  // Handle error response format (new standardized format)
+  if (!response.success) {
+    const errorMsg = response.error?.message || `HTTP ${res.status}`;
+    const error = new Error(errorMsg);
+    error.code = response.error?.code;
+    error.details = response.error?.details;
+    error.status = res.status;
+    throw error;
+  }
+
+  return response.data;
+}
+
 const api = {
-  _token: localStorage.getItem('busgo_token'),
-
-  _headers() {
-    const h = { 'Content-Type': 'application/json' };
-    if (this._token) h['Authorization'] = `Bearer ${this._token}`;
-    return h;
-  },
-
-  async _async(method, path, body) {
-    const opts = { method, headers: this._headers() };
-    if (body) opts.body = JSON.stringify(body);
-
-    const res = await fetch(`${BASE_URL}${path}`, opts);
-    const data = await res.json();
-
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
-  },
-
   // ── Auth ──────────────────────────────────────────────────
   async login(username, password) {
-    const data = await this._async('POST', '/api/auth/login', { username, password });
+    const data = await apiRequest('POST', '/api/auth/login', { username, password });
     if (data.token) {
-      this._token = data.token;
       localStorage.setItem('busgo_token', data.token);
       localStorage.setItem('busgo_user', JSON.stringify(data.user));
     }
@@ -33,11 +46,10 @@ const api = {
   },
 
   async register(username, password, name) {
-    return this._async('POST', '/api/auth/register', { username, password, name });
+    return apiRequest('POST', '/api/auth/register', { username, password, name });
   },
 
   logout() {
-    this._token = null;
     localStorage.removeItem('busgo_token');
     localStorage.removeItem('busgo_user');
   },
@@ -47,40 +59,44 @@ const api = {
     return u ? JSON.parse(u) : null;
   },
 
-  isLoggedIn() { return !!this._token; },
+  isLoggedIn() {
+    return !!localStorage.getItem('busgo_token');
+  },
 
-  // ── Buses ────────────────────────────────────────────────
-  async getBuses() { return this._async('GET', '/api/buses'); },
-  async addBus(data) { return this._async('POST', '/api/buses', data); },
-  async updateBus(id, data) { return this._async('PUT', `/api/buses/${id}`, data); },
-  async deleteBus(id) { return this._async('DELETE', `/api/buses/${id}`); },
+  // ── Buses ───────────────────────────────────────────────
+  async getBuses() { return apiRequest('GET', '/api/buses'); },
+  async addBus(data) { return apiRequest('POST', '/api/buses', data); },
+  async updateBus(id, data) { return apiRequest('PUT', `/api/buses/${id}`, data); },
+  async deleteBus(id) { return apiRequest('DELETE', `/api/buses/${id}`); },
 
-  // ── Routes ───────────────────────────────────────────────
-  async getRoutes() { return this._async('GET', '/api/routes'); },
-  async addRoute(data) { return this._async('POST', '/api/routes', data); },
-  async updateRoute(id, data) { return this._async('PUT', `/api/routes/${id}`, data); },
-  async deleteRoute(id) { return this._async('DELETE', `/api/routes/${id}`); },
+  // ── Routes ──────────────────────────────────────────────
+  async getRoutes() { return apiRequest('GET', '/api/routes'); },
+  async addRoute(data) { return apiRequest('POST', '/api/routes', data); },
+  async updateRoute(id, data) { return apiRequest('PUT', `/api/routes/${id}`, data); },
+  async deleteRoute(id) { return apiRequest('DELETE', `/api/routes/${id}`); },
 
-  // ── Schedules ───────────────────────────────────────────
+  // ── Schedules ────────────────────────────────────────────
   async getSchedules(params = {}) {
     const qs = new URLSearchParams(params).toString();
-    return this._async('GET', `/api/schedules${qs ? '?' + qs : ''}`);
+    return apiRequest('GET', `/api/schedules${qs ? '?' + qs : ''}`);
   },
-  async addSchedule(data) { return this._async('POST', '/api/schedules', data); },
-  async updateSchedule(id, data) { return this._async('PUT', `/api/schedules/${id}`, data); },
-  async deleteSchedule(id) { return this._async('DELETE', `/api/schedules/${id}`); },
+  async addSchedule(data) { return apiRequest('POST', '/api/schedules', data); },
+  async updateSchedule(id, data) { return apiRequest('PUT', `/api/schedules/${id}`, data); },
+  async deleteSchedule(id) { return apiRequest('DELETE', `/api/schedules/${id}`); },
 
-  // ── Tickets ──────────────────────────────────────────────
-  async getTickets() { return this._async('GET', '/api/tickets'); },
+  // ── Tickets ─────────────────────────────────────────────
+  async getTickets() { return apiRequest('GET', '/api/tickets'); },
   async bookTicket(schedule_id, seat_number) {
-    return this._async('POST', '/api/tickets', { schedule_id, seat_number });
+    return apiRequest('POST', '/api/tickets', { schedule_id, seat_number });
   },
   async updateTicketStatus(id, status) {
-    return this._async('PUT', `/api/tickets/${id}`, { status });
+    return apiRequest('PUT', `/api/tickets/${id}`, { status });
   },
 
   // ── Seats ───────────────────────────────────────────────
-  async getBookedSeats(scheduleId) { return this._async('GET', `/api/schedules/${scheduleId}/seats`); }
+  async getBookedSeats(scheduleId) {
+    return apiRequest('GET', `/api/schedules/${scheduleId}/seats`);
+  },
 };
 
 // Global alias
