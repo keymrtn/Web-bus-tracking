@@ -156,7 +156,13 @@
         </div>
 
         <div class="card">
-          <h3><i class="bi bi-table"></i> Daftar Jadwal Tambahan (Admin)</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;">
+            <h3 style="margin: 0;"><i class="bi bi-table"></i> Daftar Jadwal</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="sched-filter-date" style="font-size: 0.9rem;">Filter Tanggal:</label>
+              <input type="date" id="sched-filter-date" class="form-control" style="width: auto; padding: 4px 8px; font-size: 0.9rem;" onchange="renderSchedulesTable()">
+            </div>
+          </div>
           <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
@@ -280,6 +286,7 @@
 
   </main>
 
+  <script src="assets/js/api.js"></script>
   <script src="assets/js/storage.js"></script>
   <script src="assets/js/terminals.js"></script>
   <script src="assets/js/data.js"></script>
@@ -297,7 +304,7 @@
       event.currentTarget.classList.add('active');
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       // Check Admin authorization
       const currentUser = storage.getCurrentUser();
       if (!currentUser || currentUser.role !== "admin") {
@@ -307,16 +314,24 @@
       }
 
       document.getElementById("admin-name").textContent = currentUser.name;
+      
+      // Sync data from API (DB) to localStorage cache
+      await syncFromAPI();
+      // Re-initialize global helpers with fresh data
+      const freshRoutes = getSyncedRoutes();
+      if (freshRoutes && freshRoutes.length > 0) {
+        localStorage.setItem('busgo_synced_routes', JSON.stringify(freshRoutes));
+      }
 
       // Populate Select Option Helpers
       function populateOptions() {
-        // Populate Route Options
         const routeSelect = document.getElementById("sched-route");
         routeSelect.innerHTML = "";
         getRoutes().forEach(r => {
           const opt = document.createElement("option");
           opt.value = r.id;
-          opt.textContent = `${r.nama} (${r.awal} ➔ ${r.akhir})`;
+          opt.textContent = `${r.nama} (${r.awal} ➔ ${r.akhir}) — ${r.estimasi} mnt`;
+          opt.dataset.estimasi = r.estimasi;
           routeSelect.appendChild(opt);
         });
 
@@ -331,36 +346,81 @@
         });
       }
 
+      // Auto-fill jam sampai berdasarkan estimasi route
+      function autoFillJamSampai() {
+        const routeSelect = document.getElementById("sched-route");
+        const timeStart = document.getElementById("sched-time-start").value;
+        const timeEnd = document.getElementById("sched-time-end");
+        if (!routeSelect.value || !timeStart) { timeEnd.value = ""; return; }
+        const estimasi = parseInt(routeSelect.selectedOptions[0]?.dataset?.estimasi) || 0;
+        if (!estimasi) return;
+        const [h, m] = timeStart.split(":").map(Number);
+        let totalMin = h * 60 + m + estimasi;
+        const hh = String(Math.floor(totalMin / 60) % 24).padStart(2, "0");
+        const mm = String(totalMin % 60).padStart(2, "0");
+        timeEnd.value = `${hh}:${mm}`;
+      }
+      document.getElementById("sched-route").addEventListener("change", autoFillJamSampai);
+      document.getElementById("sched-time-start").addEventListener("input", autoFillJamSampai);
+
       // --- CRUD SCHEDULE ---
       const renderSchedulesTable = () => {
+        // Show schedules from API-sync + custom (auto-generate disabled)
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const autoSchedules = []; // auto-generate disabled
         const customSchedules = storage.getCustomSchedules();
+        
+        // Also include API-synced schedules
+        const syncedSchedules = typeof getSyncedSchedules === 'function' ? getSyncedSchedules() : [];
+        
+        // Merge: custom + API (custom overrides)
+        const merged = [...(syncedSchedules || [])];
+        customSchedules.forEach(cs => {
+          const idx = merged.findIndex(s => s.id === cs.id);
+          if (idx >= 0) merged[idx] = cs;
+          else merged.push(cs);
+        });
+
+        // Filter by date (default: today, set default once)
+        const filterInput = document.getElementById('sched-filter-date');
+        if (filterInput && !filterInput.value) filterInput.value = todayStr;
+        const filterDate = filterInput?.value || todayStr;
+        const filtered = merged.filter(s => {
+          const d = (s.tanggal || '').split('T')[0] || s.tanggal || '';
+          return d === filterDate;
+        });
+
+        // Sort by jamBerangkat
+        filtered.sort((a, b) => (a.jamBerangkat || '').localeCompare(b.jamBerangkat || ''));
+
         const tbody = document.getElementById("schedules-table-body");
         tbody.innerHTML = "";
 
-        if (customSchedules.length === 0) {
+        if (filtered.length === 0) {
           tbody.innerHTML = `
             <tr>
               <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                Belum ada jadwal kustom yang dibuat.
+                Tidak ada jadwal tersedia. Tambah rute dulu atau buat jadwal manual.
               </td>
             </tr>
           `;
           return;
         }
 
-        customSchedules.forEach(s => {
+        filtered.forEach(s => {
           const tr = document.createElement("tr");
           tr.innerHTML = `
-            <td style="font-weight: bold; color: var(--primary);">${s.id}</td>
+            <td style="font-weight: bold; color: var(--primary);">${s.id || '-'}</td>
             <td>
-              <div>${s.routeName}</div>
-              <small style="color: var(--text-muted);">${s.busNomor} (${s.busTipe})</small>
+              <div>${s.routeName || s.ruteAwal + ' - ' + s.ruteAkhir || '-'}</div>
+              <small style="color: var(--text-muted);">${s.busNomor || ''}${s.busTipe ? ' (' + s.busTipe + ')' : ''}</small>
             </td>
             <td>
-              <div>${s.tanggal}</div>
-              <small>${s.jamBerangkat} - ${s.jamSampai} WIB</small>
+              <div>${s.tanggal || todayStr}</div>
+              <small>${s.jamBerangkat || ''} - ${s.jamSampai || ''} WIB</small>
             </td>
-            <td>Rp ${Number(s.harga).toLocaleString("id-ID")}</td>
+            <td>Rp ${Number(s.harga || 0).toLocaleString("id-ID")}</td>
             <td style="text-align: center;">
               <button onclick="editSchedule('${s.id}')" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; width: auto; margin-right: 5px;">
                 Edit
@@ -374,7 +434,7 @@
         });
       };
 
-      document.getElementById("add-schedule-form").addEventListener("submit", (e) => {
+      document.getElementById("add-schedule-form").addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const editId = document.getElementById("edit-sched-id").value;
@@ -387,49 +447,28 @@
 
         const routeObj = getRoutes().find(r => r.id === routeId);
 
-        let customSchedules = storage.getCustomSchedules();
-
-        if (editId) {
-          // Edit Mode
-          const idx = customSchedules.findIndex(s => s.id === editId);
-          if (idx !== -1) {
-            customSchedules[idx] = {
-              id: editId,
-              routeId: routeId,
-              routeName: routeObj.nama,
-              ruteAwal: routeObj.awal,
-              ruteAkhir: routeObj.akhir,
-              busId: busId,
-              busNomor: busNo,
-              busTipe: busType,
-              tanggal: date,
-              jamBerangkat: timeStart,
-              jamSampai: timeEnd,
-              harga: price
-            };
-            localStorage.setItem("busgo_custom_schedules", JSON.stringify(customSchedules));
-            alert("Jadwal sukses diperbarui!");
+        try {
+          if (editId) {
+            // Edit via API
+            await api.updateSchedule(editId, {
+              route_id: parseInt(routeId.replace(/\D/g, "")),
+              bus_id: parseInt(busId.replace(/\D/g, "")),
+              tanggal: date, time_start: timeStart, time_end: timeEnd, price
+            });
+          } else {
+            // Create via API
+            await api.addSchedule({
+              route_id: parseInt(routeId.replace(/\D/g, "")),
+              bus_id: parseInt(busId.replace(/\D/g, "")),
+              tanggal: date, time_start: timeStart, time_end: timeEnd, price
+            });
           }
-        } else {
-          // Add Mode
-          const cleanDate = date.replace(/-/g, "");
-          const customId = `ADM-${routeId}-${Math.floor(100 + Math.random() * 900)}-${cleanDate}`;
-          const newSched = {
-            id: customId,
-            routeId: routeId,
-            routeName: routeObj.nama,
-            ruteAwal: routeObj.awal,
-            ruteAkhir: routeObj.akhir,
-            busId: busId,
-            busNomor: busNo,
-            busTipe: busType,
-            tanggal: date,
-            jamBerangkat: timeStart,
-            jamSampai: timeEnd,
-            harga: price
-          };
-          storage.saveCustomSchedule(newSched);
-          alert("Jadwal sukses dirilis!");
+          // Sync API data (API is source of truth)
+          await syncFromAPI();
+          alert(editId ? "Jadwal sukses diperbarui!" : "Jadwal sukses dirilis!");
+        } catch (err) {
+          alert("Gagal simpan ke database: " + err.message);
+          return;
         }
 
         resetScheduleForm();
@@ -461,9 +500,13 @@
         document.getElementById("sched-cancel-btn").style.display = "none";
       };
 
-      window.deleteSched = (id) => {
+      window.deleteSched = async (id) => {
         if (confirm(`Hapus jadwal ${id}?`)) {
+          try {
+            await api.deleteSchedule(id);
+          } catch(e) {}
           storage.deleteCustomSchedule(id);
+          await syncFromAPI();
           renderSchedulesTable();
         }
       };
@@ -495,7 +538,7 @@
         });
       };
 
-      document.getElementById("bus-form").addEventListener("submit", (e) => {
+      document.getElementById("bus-form").addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const editId = document.getElementById("edit-bus-id").value;
@@ -503,23 +546,28 @@
         const tipe = document.getElementById("bus-tipe").value;
         const kapasitas = parseInt(document.getElementById("bus-kapasitas").value);
 
-        let customBuses = storage.getCustomBuses();
-        if (!customBuses) {
-          customBuses = [...DEFAULT_BUSES];
-        }
-
-        if (editId) {
-          const idx = customBuses.findIndex(b => b.id === editId);
-          if (idx !== -1) {
-            customBuses[idx] = { id: editId, nomor, tipe, kapasitas };
-            storage.saveCustomBuses(customBuses);
-            alert("Data bus sukses diperbarui!");
+        try {
+          if (editId) {
+            const numericId = editId.replace(/\D/g, "");
+            if (numericId) await api.updateBus(numericId, { nomor_bus: nomor, tipe_bus: tipe, kapasitas });
+          } else {
+            await api.addBus({ nomor_bus: nomor, tipe_bus: tipe, kapasitas });
           }
-        } else {
-          const newId = `B${customBuses.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
-          customBuses.push({ id: newId, nomor, tipe, kapasitas });
+          let customBuses = storage.getCustomBuses();
+          if (!customBuses) customBuses = [...DEFAULT_BUSES];
+          if (editId) {
+            const idx = customBuses.findIndex(b => b.id === editId);
+            if (idx !== -1) customBuses[idx] = { id: editId, nomor, tipe, kapasitas };
+          } else {
+            const newId = `B${customBuses.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
+            customBuses.push({ id: newId, nomor, tipe, kapasitas });
+          }
           storage.saveCustomBuses(customBuses);
-          alert("Bus sukses ditambahkan!");
+          await syncFromAPI();
+          alert(editId ? "Data bus sukses diperbarui!" : "Bus sukses ditambahkan!");
+        } catch(err) {
+          alert("Gagal simpan ke database: " + err.message);
+          return;
         }
 
         resetBusForm();
@@ -549,11 +597,17 @@
         document.getElementById("bus-cancel-btn").style.display = "none";
       };
 
-      window.deleteBus = (id) => {
+      window.deleteBus = async (id) => {
         if (confirm(`Hapus bus ${id}?`)) {
+          try {
+            const sid = String(id);
+            const numericId = sid.replace(/\D/g, "");
+            if (numericId) await api.deleteBus(numericId);
+          } catch(e) {}
           let customBuses = storage.getCustomBuses() || [...DEFAULT_BUSES];
           customBuses = customBuses.filter(b => b.id !== id);
           storage.saveCustomBuses(customBuses);
+          await syncFromAPI();
           renderBusesTable();
           populateOptions();
         }
@@ -691,7 +745,7 @@
       setupAutocomplete("route-akhir", "route-akhir-suggestions", "route-akhir-coords", "route-awal");
 
       // --- FORM SUBMIT LOGIC ---
-      document.getElementById("route-form").addEventListener("submit", (e) => {
+      document.getElementById("route-form").addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const editId = document.getElementById("edit-route-id").value;
@@ -710,27 +764,41 @@
 
         const coordsAwal = JSON.parse(awalCoordsRaw);
         const coordsAkhir = JSON.parse(akhirCoordsRaw);
-        
-        // Buat garis lurus saja untuk simulasi rute antar terminal jika custom
         const coords = [coordsAwal, coordsAkhir];
 
-        let customRoutes = storage.getCustomRoutes();
-        if (!customRoutes) {
-          customRoutes = [...DEFAULT_ROUTES];
-        }
-
-        if (editId) {
-          const idx = customRoutes.findIndex(r => r.id === editId);
-          if (idx !== -1) {
-            customRoutes[idx] = { id: editId, nama, awal, akhir, estimasi, coords };
-            storage.saveCustomRoutes(customRoutes);
-            alert("Rute sukses diperbarui!");
+        try {
+          if (editId) {
+            // Update via API
+            await api.updateRoute(editId, {
+              origin_name: awal, origin_coords: coordsAwal,
+              dest_name: akhir, dest_coords: coordsAkhir,
+              jarak: '', estimasi: estimasi
+            });
+          } else {
+            // Create via API
+            await api.addRoute({
+              origin_name: awal, origin_coords: coordsAwal,
+              dest_name: akhir, dest_coords: coordsAkhir,
+              jarak: '', estimasi: estimasi
+            });
           }
-        } else {
-          const newId = `R${customRoutes.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
-          customRoutes.push({ id: newId, nama, awal, akhir, estimasi, coords });
+          // Also save to localStorage for legacy fallback
+          let customRoutes = storage.getCustomRoutes();
+          if (!customRoutes) customRoutes = [...DEFAULT_ROUTES];
+          if (editId) {
+            const idx = customRoutes.findIndex(r => r.id === editId);
+            if (idx !== -1) customRoutes[idx] = { id: editId, nama, awal, akhir, estimasi, coords };
+          } else {
+            const newId = `R${customRoutes.length + 1}-${Math.floor(100 + Math.random() * 900)}`;
+            customRoutes.push({ id: newId, nama, awal, akhir, estimasi, coords });
+          }
           storage.saveCustomRoutes(customRoutes);
-          alert("Rute sukses ditambahkan!");
+          // Re-sync from API to get canonical IDs
+          await syncFromAPI();
+          alert(editId ? "Rute sukses diperbarui!" : "Rute sukses ditambahkan!");
+        } catch (err) {
+          alert("Gagal simpan ke database: " + err.message);
+          return;
         }
 
         resetRouteForm();
@@ -768,11 +836,18 @@
         document.getElementById("route-cancel-btn").style.display = "none";
       };
 
-      window.deleteRoute = (id) => {
+      window.deleteRoute = async (id) => {
         if (confirm(`Hapus rute ${id}?`)) {
+          try {
+            // The API uses numeric IDs; extract number from "R1" or numeric id
+            const sid = String(id);
+            const numericId = sid.replace(/\D/g, "");
+            if (numericId) await api.deleteRoute(numericId);
+          } catch(e) { /* may fail if API route doesn't exist */ }
           let customRoutes = storage.getCustomRoutes() || [...DEFAULT_ROUTES];
           customRoutes = customRoutes.filter(r => r.id !== id);
           storage.saveCustomRoutes(customRoutes);
+          await syncFromAPI();
           renderRoutesTable();
           populateOptions();
         }

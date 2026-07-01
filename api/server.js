@@ -19,7 +19,8 @@ const { generalLimiter, authLimiter } = require('./middleware/rateLimit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(requestId);
-app.use(generalLimiter);
+// Terapkan rate limiter hanya ke /api/ agar static files (HTML/CSS/JS) bebas
+app.use('/api', generalLimiter);
 app.use(cors());
 app.use(express.json());
 
@@ -223,25 +224,57 @@ app.use((err, req, res, next) => {
   return error(res, new AppError('Terjadi kesalahan sistem.', 'INTERNAL_ERROR', 500), false);
 });
 
-// ─── Seed data ───────────────────────────────────────────────────────────────
+// ─── Seed data ───────────────────────────────────────────────
 function seedIfEmpty() {
   db.get('SELECT COUNT(*) as cnt FROM buses', [], (err, row) => {
     if (row && row.cnt > 0) return;
     console.log('Seeding default data...');
-    const run = db.prepare.bind(db);
-    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)')(['B 7001 VIP', 'Sleeper Class', 18, 'active']);
-    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)')(['B 7002 VIP', 'Executive AC', 30, 'active']);
-    run('INSERT INTO routes (origin_name, origin_coords, dest_name, dest_coords, jarak) VALUES (?,?,?,?,?)')(
-      ['Jakarta (Kalideres)', JSON.stringify([-6.1601, 106.7029]), 'Bandung (Cicaheum)', JSON.stringify([-6.9011, 107.6534]), '180 km']
-    );
-    run('INSERT INTO routes (origin_name, origin_coords, dest_name, dest_coords, jarak) VALUES (?,?,?,?,?)')(
-      ['Jakarta (Kalideres)', JSON.stringify([-6.1601, 106.7029]), 'Semarang (Terboyo)', JSON.stringify([-6.9602, 110.4578]), '450 km']
-    );
-    run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)')([1, 1, '2026-06-25', '07:00', '10:00', 150000]);
-    run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)')([1, 1, '2026-06-25', '13:00', '16:00', 150000]);
-    run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)')([1, 2, '2026-06-27', '09:00', '12:00', 120000]);
-    run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)')([2, 2, '2026-06-25', '07:30', '13:30', 250000]);
-    run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)')([2, 2, '2026-06-27', '19:00', '01:00', 250000]);
+    const run = (sql, params) => db.run(sql, params);
+    
+    // Seed 5 default buses
+    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)', ['B 7001 VIP', 'Double Decker', 40, 'active']);
+    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)', ['B 7002 VIP', 'Executive AC', 30, 'active']);
+    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)', ['B 7003 VIP', 'Super Executive', 20, 'active']);
+    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)', ['B 7004 VIP', 'Executive AC', 30, 'active']);
+    run('INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)', ['B 7005 VIP', 'Sleeper Bus', 18, 'active']);
+
+    // Seed 5 default routes with coords paths
+    const routes = [
+      ['Jakarta', 'Terminal Kalideres', JSON.stringify([-6.1601, 106.7029]), 
+       'Bandung', 'Terminal Lebak Siliwangi', JSON.stringify([-6.8904, 107.6106]), '180 km', 180],
+      ['Bandung', 'Terminal Lebak Siliwangi', JSON.stringify([-6.8904, 107.6106]),
+       'Jakarta', 'Terminal Kalideres', JSON.stringify([-6.1601, 106.7029]), '180 km', 180],
+      ['Jakarta', 'Terminal Kalideres', JSON.stringify([-6.1601, 106.7029]),
+       'Bogor', 'Terminal Baranangsiang', JSON.stringify([-6.6025, 106.8083]), '90 km', 90],
+      ['Jakarta', 'Terminal Kalideres', JSON.stringify([-6.1601, 106.7029]),
+       'Semarang', 'Terminal Tirtonadi', JSON.stringify([-6.9667, 110.4167]), '450 km', 480],
+      ['Jakarta', 'Terminal Kalideres', JSON.stringify([-6.1601, 106.7029]),
+       'Surabaya', 'Terminal Bungurasih', JSON.stringify([-7.3524, 112.7246]), '800 km', 720],
+    ];
+    routes.forEach(r => {
+      const originName = `${r[0]} (${r[1]})`;
+      const destName = `${r[3]} (${r[4]})`;
+      run('INSERT INTO routes (origin_name, origin_coords, dest_name, dest_coords, jarak, estimasi) VALUES (?,?,?,?,?,?)',
+        [originName, r[2], destName, r[5], r[6], r[7]]);
+    });
+
+    // Also seed some schedules for today + next 7 days
+    const today = new Date();
+    const busCount = 5;
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + d);
+      const dateStr = date.toISOString().split('T')[0];
+      const routeCount = 5;
+      for (let rid = 1; rid <= routeCount; rid++) {
+        run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)',
+          [rid, (rid % busCount) + 1, dateStr, '07:00', '10:00', 100000 + (rid * 20000)]);
+        run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)',
+          [rid, ((rid + 1) % busCount) + 1, dateStr, '12:00', '15:00', 100000 + (rid * 20000)]);
+        run('INSERT INTO schedules (route_id, bus_id, tanggal, time_start, time_end, price) VALUES (?,?,?,?,?,?)',
+          [rid, ((rid + 2) % busCount) + 1, dateStr, '18:00', '21:00', 100000 + (rid * 20000)]);
+      }
+    }
     console.log('Seed complete.');
   });
 }

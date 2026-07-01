@@ -132,6 +132,8 @@
   </main>
 
   <script src="assets/js/api.js"></script>
+  <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
   <script src="assets/js/seat-selector.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
@@ -140,8 +142,11 @@
         return;
       }
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const scheduleId = urlParams.get('scheduleId');
+      // Sync data from API to localStorage cache
+      await syncFromAPI();
+
+      const params = new URLSearchParams(window.location.search);
+      const scheduleId = params.get("scheduleId");
       if (!scheduleId) {
         window.location.href = "index.html";
         return;
@@ -152,46 +157,97 @@
       document.getElementById("nama").value = user.name || "";
 
       let sch = null;
+      let numericSchedId = null;
       window.apiBookedSeats = [];
 
       async function loadScheduleData() {
         try {
-          const schedules = await api.getSchedules();
-          sch = schedules.find(s => s.id == scheduleId);
+          // Determine numeric schedule_id from synced API data first
+          if (typeof scheduleId === 'string' && !/^\d+$/.test(scheduleId)) {
+            // Local-generated string ID (SCH-R1-...), find matching API schedule
+            const synced = getSyncedSchedules();
+            const sidNum = parseInt(scheduleId.replace(/\D/g, ''), 10);
+            // Try to find by numeric part match
+            const match = synced.find(s => s.id == sidNum || s.id == scheduleId.replace(/^SCH-/, ''));
+            if (match) numericSchedId = match.id;
+          } else {
+            numericSchedId = parseInt(scheduleId, 10);
+          }
+
+          // Try local schedules first (API-synced + custom)
+          const syncedSchedules = typeof getSyncedSchedules === 'function' ? getSyncedSchedules() : [];
+          const customSchedules = storage.getCustomSchedules();
+          // Merge: API first then custom (override dupes)
+          let allLocal = [...(syncedSchedules || [])];
+          customSchedules.forEach(cs => {
+            const idx = allLocal.findIndex(s => s.id === cs.id);
+            if (idx >= 0) allLocal[idx] = cs;
+            else allLocal.push(cs);
+          });
+          
+          
+          sch = allLocal.find(s => s.id == scheduleId);
+          
+          if (!sch) {
+            // Fallback: try from API
+            const schedules = await api.getSchedules();
+            sch = schedules.find(s => s.id == scheduleId);
+          }
           if (!sch) {
             alert("Jadwal tidak ditemukan.");
             window.location.href = "index.html";
             return;
           }
 
-          // Fetch booked seats from database
-          const seats = await api.getBookedSeats(scheduleId);
-          window.apiBookedSeats = seats.map(s => s.seat_number.toString());
+          // Fetch booked seats from storage (cross-session persistent)
+          try {
+            const seats = await api.getBookedSeats(numericSchedId || scheduleId);
+            window.apiBookedSeats = seats.map(s => s.seat_number.toString());
+          } catch(e) {
+            // Fallback to storage tickets
+            const tickets = storage.getTickets().filter(t => t.scheduleId === scheduleId && t.statusTiket !== 'dibatalkan');
+            window.apiBookedSeats = tickets.reduce((arr, t) => arr.concat(t.selectedSeats || []), []);
+          }
+
+          // Normalize sch to support both API format and local data.js format
+          const sOrigin = sch.origin_name || sch.ruteAwal || '';
+          const sDest = sch.dest_name || sch.ruteAkhir || '';
+          const sBusNo = sch.bus_nomor || sch.busNomor || '';
+          const sBusType = sch.bus_tipe || sch.busTipe || '';
+          const sTanggal = sch.tanggal || '';
+          const sTimeStart = sch.time_start || sch.jamBerangkat || '';
+          const sTimeEnd = sch.time_end || sch.jamSampai || '';
+          const sKapasitas = sch.kapasitas || 30;
+          const sPrice = sch.price || sch.harga || 0;
 
           // Render details
           document.getElementById("sch-details").innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
               <div>
-                <strong style="font-size: 1.2rem; display: block;">${sch.origin_name} ➔ ${sch.dest_name}</strong>
+                <strong style="font-size: 1.2rem; display: block;">${sOrigin} ➔ ${sDest}</strong>
                 <span style="font-size: 0.85rem; color: var(--text-muted);">${sch.jarak || ''}</span>
               </div>
-              <span class="badge badge-warning">${sch.bus_nomor}</span>
+              <span class="badge badge-warning">${sBusNo}</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.95rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
               <div>
                 <span style="color: var(--text-muted); display: block;">Tanggal</span>
-                <strong>${sch.tanggal}</strong>
+                <strong>${sTanggal}</strong>
               </div>
               <div>
                 <span style="color: var(--text-muted); display: block;">Waktu</span>
-                <strong>${sch.time_start} - ${sch.time_end} WIB</strong>
+                <strong>${sTimeStart} - ${sTimeEnd} WIB</strong>
               </div>
               <div>
                 <span style="color: var(--text-muted); display: block;">Tipe Bus</span>
-                <strong>${sch.bus_tipe}</strong>
+                <strong>${sBusType}</strong>
               </div>
             </div>
           `;
+
+          // Override sch with normalized values for later use
+          sch.kapasitas = sKapasitas;
+          sch.price = sPrice;
 
           updateSeatsBadge();
           updateTotal();
@@ -263,10 +319,36 @@
         }
 
         try {
-          // Reserve each selected seat sequentially
-          for (const seat of selectedSeats) {
-            await api.bookTicket(sch.id, seat);
+          // Save to local storage FIRST (synchronous) so my-tickets works even if API fails
+          const ticket = {
+            id: `TKT-${Date.now()}`,
+            username: api.getCurrentUser()?.username || 'guest',
+            scheduleId: sch.id,
+            namaPenumpang: document.getElementById("nama").value.trim(),
+            noHP: document.getElementById("hp").value.trim(),
+            rute: `${sch.ruteAwal || sch.origin_name || ''} - ${sch.ruteAkhir || sch.dest_name || ''}`,
+            ruteAwal: sch.ruteAwal || sch.origin_name || '',
+            ruteAkhir: sch.ruteAkhir || sch.dest_name || '',
+            busNomor: sch.busNomor || sch.bus_nomor || '',
+            tanggal: sch.tanggal,
+            jamBerangkat: sch.jamBerangkat || sch.time_start,
+            selectedSeats: selectedSeats,
+            jumlahKursi: selectedSeats.length,
+            statusTiket: "dibeli",
+            createdAt: new Date().toISOString(),
+            totalHarga: (sch.price || sch.harga || 0) * selectedSeats.length
+          };
+          storage.saveTicket(ticket);
+
+          // Then try API (may fail silently)
+          try {
+            for (const seat of selectedSeats) {
+              await api.bookTicket(numericSchedId || sch.id, seat);
+            }
+          } catch (apiErr) {
+            console.warn('API booking failed, ticket saved locally:', apiErr.message);
           }
+
           alert("Tiket berhasil dipesan!");
           window.location.href = "my-tickets.html";
         } catch (err) {

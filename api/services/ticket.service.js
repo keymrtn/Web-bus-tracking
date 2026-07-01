@@ -18,7 +18,7 @@ function getAll(userId, isAdmin) {
   return new Promise((resolve, reject) => {
     db.all(sql, params, (err, rows) => {
       if (err) return reject(err);
-      resolve(rows.map(r => ({ ...r, bookedSeats: parseJsonSafe(r.booked_seats) })));
+      resolve(rows);
     });
   });
 }
@@ -37,7 +37,7 @@ function getById(id) {
     db.get(query, [id], (err, row) => {
       if (err) return reject(err);
       if (!row) return reject(new NotFoundError('Tiket'));
-      resolve({ ...row, bookedSeats: parseJsonSafe(row.booked_seats) });
+      resolve(row);
     });
   });
 }
@@ -52,13 +52,15 @@ function book(userId, { schedule_id, seat_number }) {
     db.get('SELECT * FROM schedules WHERE id=?', [sid], (err, schedule) => {
       if (err) return reject(err);
       if (!schedule) return reject(new NotFoundError('Jadwal'));
-      const seats = parseJsonSafe(schedule.booked_seats);
-      if (seats.map(s => String(s)).includes(seat)) {
-        return reject(new ConflictError(`Seat ${seat} sudah terbooking.`));
-      }
-      seats.push(seat);
-      db.run('UPDATE schedules SET booked_seats=? WHERE id=?', [JSON.stringify(seats), sid], (err2) => {
+
+      // Check seat availability from tickets table
+      db.all('SELECT seat_number FROM tickets WHERE schedule_id=? AND status != ?', [sid, 'cancelled'], (err2, bookedRows) => {
         if (err2) return reject(err2);
+        const seats = bookedRows.map(r => String(r.seat_number));
+        if (seats.includes(seat)) {
+          return reject(new ConflictError(`Seat ${seat} sudah terbooking.`));
+        }
+
         db.run(
           'INSERT INTO tickets (user_id, schedule_id, seat_number, status) VALUES (?,?,?,?)',
           [userId, sid, seat, 'pending'],
@@ -90,10 +92,9 @@ function updateStatus(id, status, userId, isAdmin) {
 /** Get booked seats untuk schedule */
 function getBookedSeats(scheduleId) {
   return new Promise((resolve, reject) => {
-    db.get('SELECT booked_seats FROM schedules WHERE id=?', [scheduleId], (err, row) => {
+    db.all('SELECT seat_number FROM tickets WHERE schedule_id=? AND status != ?', [scheduleId, 'cancelled'], (err, rows) => {
       if (err) return reject(err);
-      if (!row) return reject(new NotFoundError('Jadwal'));
-      resolve({ bookedSeats: parseJsonSafe(row.booked_seats) });
+      resolve({ bookedSeats: rows.map(r => r.seat_number) });
     });
   });
 }

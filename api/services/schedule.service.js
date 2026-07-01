@@ -35,7 +35,7 @@ function getAll(options = {}) {
   }).join(', ');
 
   const baseQuery = `
-    SELECT s.*, r.origin_name, r.dest_name, b.nomor AS bus_nomor, b.tipe AS bus_tipe, b.kapasitas
+    SELECT s.*, r.origin_name, r.dest_name, b.nomor_bus, b.tipe_bus, b.kapasitas
     FROM schedules s
     JOIN routes r ON s.route_id = r.id
     JOIN buses b ON s.bus_id = b.id
@@ -63,7 +63,7 @@ function getAll(options = {}) {
 function getById(id) {
   return new Promise((resolve, reject) => {
     const query = `
-      SELECT s.*, r.origin_name, r.dest_name, r.jarak, b.nomor AS bus_nomor, b.tipe AS bus_tipe, b.kapasitas
+      SELECT s.*, r.origin_name, r.dest_name, r.jarak, b.nomor_bus, b.tipe_bus, b.kapasitas
       FROM schedules s
       JOIN routes r ON s.route_id = r.id
       JOIN buses b ON s.bus_id = b.id

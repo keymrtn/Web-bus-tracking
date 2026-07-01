@@ -180,10 +180,47 @@
 
   <!-- Leaflet Script -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="assets/js/api.js"></script>
   <script src="assets/js/storage.js"></script>
   <script src="assets/js/data.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    // ── Route Helpers ─────────────────────────────────────────
+    function findRouteFromTicket(ticket) {
+      const cached = getRoutes(); // from localStorage or defaults
+      let r = cached.find(r => r.nama === ticket.rute);
+      if (!r) {
+        const norm = ticket.rute.replace(/[➔→]/g, ' - ');
+        r = cached.find(r => r.nama === norm);
+      }
+      return r || null;
+    }
+    function buildFallbackRoute(ticket) {
+      const parts = ticket.rute.split(/[➔→\\-]/).map(s => s.trim());
+      if (parts.length < 2) return null;
+      // Known terminal coords + default dummy for unknown
+      const knownCoords = {
+        'Terminal Kalideres': [-6.1601, 106.7029],
+        'Terminal Ubung': [-8.6322, 115.2078],
+        'Terminal Kampung Rambutan': [-6.2970, 106.8797],
+        'Terminal Lebak Bulus': [-6.3399, 106.7905],
+        'Terminal Pulo Gebang': [-6.2664, 106.9523],
+        'Terminal Depok': [-6.4048, 106.8177],
+        'Terminal Bekasi': [-6.2349, 106.9896],
+        'Terminal Bogor': [-6.5971, 106.8060],
+      };
+      const awal = ticket.ruteAwal || parts[0] || '';
+      const akhir = ticket.ruteAkhir || parts[1] || '';
+      const cAwal = knownCoords[awal] || [-6.2, 106.8];
+      const cAkhir = knownCoords[akhir] || [-6.2, 106.8];
+      return {
+        nama: ticket.rute,
+        awal, akhir,
+        estimasi: 120,
+        coords: [cAwal, cAkhir]
+      };
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const ticketId = urlParams.get("ticketId");
       
@@ -214,10 +251,25 @@
       document.getElementById("trip-title").textContent = ticket.rute;
       document.getElementById("sim-sched-time").textContent = ticket.jamBerangkat;
 
-      // Find route details
-      const route = ROUTES.find(r => r.nama === ticket.rute);
+      // Find route: fetch directly from API (skip getRoutes/DEFAULT_ROUTES)
+      let route = null;
+      try {
+        const raw = await apiRequest('GET', '/api/v1/routes');
+        if (Array.isArray(raw)) {
+          const mapped = raw.map(apiRouteToFrontend);
+          route = mapped.find(r => r.nama === ticket.rute);
+          if (!route) {
+            const norm = ticket.rute.replace(/[➔→]/g, ' - ');
+            route = mapped.find(r => r.nama === norm);
+          }
+          if (!route && mapped.length === 0) {
+            route = buildFallbackRoute(ticket);
+          }
+        }
+      } catch (e) {}
+      if (!route) route = buildFallbackRoute(ticket);
       if (!route) {
-        alert("Data rute tidak valid!");
+        alert("Data rute tidak valid! Tidak ditemukan rute: " + ticket.rute);
         window.location.href = "my-tickets.html";
         return;
       }

@@ -34,11 +34,13 @@
     </a>
   </nav>
 
+  <script src="assets/js/api.js"></script>
   <script src="assets/js/storage.js"></script>
+  <script src="assets/js/data.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // Check Auth
-      const currentUser = storage.getCurrentUser();
+      // Check Auth — support both api.js and storage keys
+      const currentUser = api.getCurrentUser() || storage.getCurrentUser();
       if (!currentUser) {
         window.location.href = "login.html";
         return;

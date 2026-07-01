@@ -43,36 +43,36 @@
   </div>
 
   <script src="assets/js/storage.js"></script>
+  <script src="assets/js/api.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       // Auto redirect if already logged in as admin
-      const user = storage.getCurrentUser();
-      if (user && user.role === "admin") {
-        window.location.href = "admin.html";
-      }
+      try { const user = await api.getCurrentUser(); if (user && user.role === "admin") { window.location.href = "admin.html"; return; } } catch(e) {}
+      // Also check localStorage for legacy admin login
+      const storedUser = storage.getCurrentUser();
+      if (storedUser && storedUser.role === "admin") { window.location.href = "admin.html"; return; }
 
-      document.getElementById("login-admin-form").addEventListener("submit", (e) => {
+      document.getElementById("login-admin-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        
+        const errorAlert = document.getElementById("error-alert");
+        errorAlert.style.display = "none";
+
         const usernameVal = document.getElementById("username").value;
         const passwordVal = document.getElementById("password").value;
-        
-        const res = storage.login(usernameVal, passwordVal);
-        
-        if (res.success) {
-          if (res.user.role === "admin") {
+
+        try {
+          await api.login(usernameVal, passwordVal);
+          const userData = api.getCurrentUser();
+          if (userData && userData.role === "admin") {
             window.location.href = "admin.html";
           } else {
-            // Logout user if not admin
-            storage.logout();
-            const err = document.getElementById("error-alert");
-            err.style.display = "block";
-            err.textContent = "Akses ditolak! Akun Anda tidak memiliki hak akses Administrator.";
+            api.logout();
+            errorAlert.style.display = "block";
+            errorAlert.textContent = "Akses ditolak! Akun Anda tidak memiliki hak akses Administrator.";
           }
-        } else {
-          const err = document.getElementById("error-alert");
-          err.style.display = "block";
-          err.textContent = res.message;
+        } catch (err) {
+          errorAlert.style.display = "block";
+          errorAlert.textContent = err.message || "Login gagal. Periksa kredensial Anda.";
         }
       });
     });

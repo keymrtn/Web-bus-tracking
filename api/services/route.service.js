@@ -54,6 +54,7 @@ function getAll(options = {}) {
           dest_name: r.dest_name,
           dest_coords: parseJsonSafe(r.dest_coords),
           jarak: r.jarak,
+          estimasi: r.estimasi || 0,
         }));
         resolve({ data: routes, total, page, perPage });
       });
@@ -76,6 +77,7 @@ function getById(id) {
         dest_name: row.dest_name,
         dest_coords: parseJsonSafe(row.dest_coords),
         jarak: row.jarak,
+        estimasi: row.estimasi || 0,
       });
     });
   });
@@ -84,7 +86,7 @@ function getById(id) {
 /**
  * Create rute baru (admin only)
  */
-function create({ origin_name, origin_coords, dest_name, dest_coords, jarak }) {
+function create({ origin_name, origin_coords, dest_name, dest_coords, jarak, estimasi }) {
   validateRequired(['origin_name', 'dest_name'], { origin_name, dest_name });
   validateStringLength(origin_name, 'Origin name', 1, 100);
   validateStringLength(dest_name, 'Dest name', 1, 100);
@@ -93,8 +95,8 @@ function create({ origin_name, origin_coords, dest_name, dest_coords, jarak }) {
 
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO routes (origin_name, origin_coords, dest_name, dest_coords, jarak) VALUES (?,?,?,?,?)',
-      [origin_name.trim(), coords(origin_coords), dest_name.trim(), coords(dest_coords), jarak || ''],
+      'INSERT INTO routes (origin_name, origin_coords, dest_name, dest_coords, jarak, estimasi) VALUES (?,?,?,?,?,?)',
+      [origin_name.trim(), coords(origin_coords), dest_name.trim(), coords(dest_coords), jarak || '', estimasi || 0],
       function (err) {
         if (err) return reject(err);
         resolve({ id: this.lastID });
@@ -118,6 +120,7 @@ function update(id, data) {
     data.dest_name ? ['dest_name', data.dest_name.trim()] : null,
     data.dest_coords !== undefined ? ['dest_coords', coords(data.dest_coords)] : null,
     data.jarak !== undefined ? ['jarak', data.jarak || ''] : null,
+    data.estimasi !== undefined ? ['estimasi', data.estimasi] : null,
   ].filter(Boolean);
 
   if (!fields.length) return Promise.resolve({ success: true, unchanged: true });

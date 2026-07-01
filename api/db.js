@@ -16,9 +16,12 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS buses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nomor TEXT UNIQUE NOT NULL,
-      tipe TEXT NOT NULL,
-      kapasitas INTEGER NOT NULL
+      nomor_bus TEXT UNIQUE NOT NULL,
+      tipe_bus TEXT NOT NULL,
+      kapasitas INTEGER NOT NULL,
+      status TEXT DEFAULT 'active',
+      created_by INTEGER,
+      created_at TEXT
     )
   `);
 
@@ -29,7 +32,8 @@ db.serialize(() => {
       origin_coords TEXT NOT NULL,
       dest_name TEXT NOT NULL,
       dest_coords TEXT NOT NULL,
-      jarak TEXT
+      jarak TEXT,
+      estimasi INTEGER DEFAULT 0
     )
   `);
 

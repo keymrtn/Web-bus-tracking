@@ -23,7 +23,13 @@ function getAll(options = {}) {
       if (err) return reject(err);
       db.all(sql, params, (err2, rows) => {
         if (err2) return reject(err2);
-        resolve({ data: rows, total: countRow ? countRow.total : 0 });
+        const buses = rows.map(r => ({
+          id: r.id,
+          nomor: r.nomor_bus, nomor_bus: r.nomor_bus,
+          tipe: r.tipe_bus, tipe_bus: r.tipe_bus,
+          kapasitas: r.kapasitas, status: r.status
+        }));
+        resolve({ data: buses, total: countRow ? countRow.total : 0 });
       });
     });
   });
@@ -35,23 +41,30 @@ function getById(id) {
     db.get('SELECT * FROM buses WHERE id = ?', [id], (err, row) => {
       if (err) return reject(err);
       if (!row) return reject(new NotFoundError('Bus'));
-      resolve(row);
+      resolve({
+        id: row.id,
+        nomor: row.nomor_bus, nomor_bus: row.nomor_bus,
+        tipe: row.tipe_bus, tipe_bus: row.tipe_bus,
+        kapasitas: row.kapasitas, status: row.status
+      });
     });
   });
 }
 
 /** Create bus baru (admin only) */
-function create({ nomor, tipe, kapasitas, status }) {
-  validateRequired(['nomor', 'tipe', 'kapasitas'], { nomor, tipe, kapasitas });
-  validateStringLength(nomor, 'Nomor bus', 1, 50);
-  validateStringLength(tipe, 'Tipe bus', 1, 50);
+function create({ nomor, tipe, nomor_bus, tipe_bus, kapasitas, status }) {
+  const nomorVal = (nomor || nomor_bus || '').trim();
+  const tipeVal = (tipe || tipe_bus || '').trim();
+  validateRequired(['nomor', 'tipe', 'kapasitas'], { nomor: nomorVal, tipe: tipeVal, kapasitas });
+  validateStringLength(nomorVal, 'Nomor bus', 1, 50);
+  validateStringLength(tipeVal, 'Tipe bus', 1, 50);
   const kapasitasNum = validatePositiveInt(kapasitas, 'Kapasitas');
   const statusVal = status || 'active';
 
   return new Promise((resolve, reject) => {
     db.run(
       'INSERT INTO buses (nomor_bus, tipe_bus, kapasitas, status) VALUES (?,?,?,?)',
-      [nomor.trim(), tipe.trim(), kapasitasNum, statusVal],
+      [nomorVal, tipeVal, kapasitasNum, statusVal],
       function (err) {
         if (err) {
           if (err.message.includes('UNIQUE')) return reject(new ValidationError('Nomor bus sudah ada.', [{ field: 'nomor', message: 'Nomor bus sudah terdaftar.' }]));
@@ -64,17 +77,19 @@ function create({ nomor, tipe, kapasitas, status }) {
 }
 
 /** Update bus (admin only) */
-function update(id, { nomor, tipe, kapasitas, status }) {
-  validateRequired(['nomor', 'tipe', 'kapasitas'], { nomor, tipe, kapasitas });
-  validateStringLength(nomor, 'Nomor bus', 1, 50);
-  validateStringLength(tipe, 'Tipe bus', 1, 50);
+function update(id, { nomor, tipe, nomor_bus, tipe_bus, kapasitas, status }) {
+  const nomorVal = (nomor || nomor_bus || '').trim();
+  const tipeVal = (tipe || tipe_bus || '').trim();
+  validateRequired(['nomor', 'tipe', 'kapasitas'], { nomor: nomorVal, tipe: tipeVal, kapasitas });
+  validateStringLength(nomorVal, 'Nomor bus', 1, 50);
+  validateStringLength(tipeVal, 'Tipe bus', 1, 50);
   const kapasitasNum = validatePositiveInt(kapasitas, 'Kapasitas');
   const statusVal = status || 'active';
 
   return new Promise((resolve, reject) => {
     db.run(
       'UPDATE buses SET nomor_bus=?, tipe_bus=?, kapasitas=?, status=? WHERE id=?',
-      [nomor.trim(), tipe.trim(), kapasitasNum, statusVal, id],
+      [nomorVal, tipeVal, kapasitasNum, statusVal, id],
       function (err) {
         if (err) return reject(err);
         if (this.changes === 0) return reject(new NotFoundError('Bus'));

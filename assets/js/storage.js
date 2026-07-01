@@ -141,29 +141,27 @@ const storage = {
 
   // --- SEAT CAPACITY MANAGEMENT ---
   getAvailableSeats(scheduleId) {
+    scheduleId = String(scheduleId);
     let capacity = 30; // Default fallback
     let sch = null;
     
     if (scheduleId.startsWith("SCH-")) {
       const parts = scheduleId.split("-");
       if (parts.length >= 4) {
-        const dateStr = parts[3];
-        const formattedDate = `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}`;
-        if (typeof generateSchedulesForDate === "function") {
-          const schedules = generateSchedulesForDate(formattedDate);
-          sch = schedules.find(s => s.id === scheduleId);
+        // Try custom schedules first
+        const allCustom = this.getCustomSchedules();
+        sch = allCustom.find(s => s.id === scheduleId);
+        // Fallback: API-synced schedules
+        if (!sch && typeof getSyncedSchedules === "function") {
+          const synced = getSyncedSchedules();
+          sch = synced.find(s => s.id === scheduleId);
         }
       }
     } else {
       const customSchedules = this.getCustomSchedules();
       const foundCustom = customSchedules.find(s => s.id === scheduleId);
       if (foundCustom) {
-        if (typeof generateSchedulesForDate === "function") {
-          const schedules = generateSchedulesForDate(foundCustom.tanggal);
-          sch = schedules.find(s => s.id === scheduleId);
-        } else {
-          sch = foundCustom;
-        }
+        sch = foundCustom;
       }
     }
     

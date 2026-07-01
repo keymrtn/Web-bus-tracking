@@ -5,10 +5,10 @@ const rateLimit = require('express-rate-limit');
 const RATE_MSG = { success: false, error: { code: 'RATE_LIMIT', message: 'Terlalu banyak request. Coba lagi nanti.' } };
 const AUTH_MSG = { success: false, error: { code: 'RATE_LIMIT', message: 'Terlalu banyak percobaan login. Tunggu 15 menit.' } };
 
-/** General rate limit — 100 req / 1 menit */
+/** General rate limit — 500 req / 1 menit */
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: RATE_MSG,
